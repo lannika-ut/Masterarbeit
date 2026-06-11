@@ -19,3 +19,12 @@ Page 1 Figure erstellt.
 08.06.2026 09:45 - 15:30 Uhr
 Parameterwerte rausgesucht und schonmal in Python implementiert als Klasse. 
 Besprechung mit Anne: erstmal Camillas splitting scheme verwenden mit einem corrector step am Ende noch für die Massenerhaltung. Jetzt dann schwache Formulierung herleiten, Pseudocode erstellen und dann anfangen mit Implementierung. Anne ist nächste Woche im Urlaub, da kann ich dann weiter implementieren und schon am Poster arbeiten, wenn ich will. Für die Page 1 Figures findet sie gut, auf Porenskala noch Temperaturen eintragen und Verbindung zwischen beiden Bildern herstellen. Außerdem kann ich noch die Primärvariablen "einzeichnen" bzw halt dazuschreiben ice content -> porosity, water content -> pressure head und so.
+
+09.06.2026 09:00 - 15:00 Uhr
+schwache Formulierung hergeleitet, getext und Pseudocode geschrieben
+
+10.06.2026 13:00 - 15:30 Uhr
+Page 1 Figure fertig gemacht, Besprechung mit Anne bzgl schwacher Formulierung und splitting Strategie.
+
+11.06.2026 09:00 - 15:30 Uhr
+Parameterklasse erstellt, Parameter recherchiert, gleichzeitig Organigramm in canva angefangen. Problem noch dass die Schneedichten für verschiedene Paramterisierungen (v.a. Yamaguchi für van Genuchten: Dichte 600 - 360 vs Domine für SSA0: Dichte 84 - 340) wie damit umgehen?
