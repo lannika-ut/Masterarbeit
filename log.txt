@@ -1,0 +1,21 @@
+29.05.2026 10:00 - 14:00 Uhr
+Zwischenergebnisse werden jetzt stündlich gespeichert und ich kann die Auswertung auf der Original-Auflösung durchführen. Mehrere Beispiele laufen lassen. Sand über Schluff, Schluff über Sand funktioniert beides mit Anfangsbedingung -0.01 m in ca 15 Minuten Laufzeit. 
+To dos: Page 1 Figure erstellen, im report alles auf h_w (pressure head) umstellen, Poster anfangen, Code aufräumen
+
+01.06.2026 08:50 - Uhr
+Besprechung mit Anne: Ergebnisse sehen gut aus, dann kann ich jetzt mit dem Schnee anfangen. Upstream weighting macht erstmal nicht so mega viel Sinn, weil der Fluss glaub in den Elementen und nicht über die Grenze berechnet wird. Außerdem konvergiert es ja im heterogenen Fall auch ohne averaging. Als nächstes räum ich die Gleichungen auf, damit alles ordentlich auf h_w läuft und dann soll ich die schwache Form herleiten, vielleicht auch einmal ausführlich für die Richards Gleichung. Danach schau ich nach Kopplungsmethoden für finite Elemente (z.B. predictor - corrector).
+-> Ne, ich muss zuerst nach splitting schemes schauen und dann dafür die schwache Form herleiten, weil ja je nach Schema manche Variablen noch alt sind und deswegen nicht mit der Testfunktion multipliziert werden müssen.
+Hab jetzt erstmal im Report alles umgeschrieben auf h_w und noch die schwache Form der transienten Richards Gleichung hergeleitet. Morgen muss ich mich dann mit den splitting schemes für finite Elemente beschäftigen, was es da so gibt.
+
+02.06.2026 09:00 - 12:30 Uhr
+nach splitting Strategien geschaut, auch noch Mail an Adrian geschrieben, wie sie das gemacht haben
+
+05.06. 10:30 - 16:00 Uhr
+Adrians Antwort: monolithisch, also alles zusammen, vermutlich mit mixed finite elements, da hab ich mich dann noch ein bisschen zu informiert. Da wird quasi jede Gleichung mit ihrer eigenen Testfunktion multipliziert und dann muss man auch noch darauf achten (zumindest bei Navier-Stokes) dass die Funktionenräume kompatibel und stabil sind. Danach hab ich mich an die Page 1 Figure gesetzt.
+
+06.06.2026 13:00 - 16:00 Uhr
+Page 1 Figure erstellt.
+
+08.06.2026 09:45 - 15:30 Uhr
+Parameterwerte rausgesucht und schonmal in Python implementiert als Klasse. 
+Besprechung mit Anne: erstmal Camillas splitting scheme verwenden mit einem corrector step am Ende noch für die Massenerhaltung. Jetzt dann schwache Formulierung herleiten, Pseudocode erstellen und dann anfangen mit Implementierung. Anne ist nächste Woche im Urlaub, da kann ich dann weiter implementieren und schon am Poster arbeiten, wenn ich will. Für die Page 1 Figures findet sie gut, auf Porenskala noch Temperaturen eintragen und Verbindung zwischen beiden Bildern herstellen. Außerdem kann ich noch die Primärvariablen "einzeichnen" bzw halt dazuschreiben ice content -> porosity, water content -> pressure head und so.
