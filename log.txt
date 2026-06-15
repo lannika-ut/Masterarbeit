@@ -29,5 +29,8 @@ Page 1 Figure fertig gemacht, Besprechung mit Anne bzgl schwacher Formulierung u
 11.06.2026 09:00 - 15:30 Uhr
 Parameterklasse erstellt, Parameter recherchiert, gleichzeitig Organigramm in canva angefangen. Problem noch dass die Schneedichten für verschiedene Paramterisierungen (v.a. Yamaguchi für van Genuchten: Dichte 600 - 360 vs Domine für SSA0: Dichte 84 - 340) wie damit umgehen?
 
-12.06.2026 10:20 - Uhr
+12.06.2026 10:20 - 16:30 Uhr
 Recherche best practice Python Code schreiben, Klasse Parameter kommentiert und formatiert. Klasse BoundaryCondition geschrieben. Die ist aber noch nicht getestet, also das muss ich noch machen.
+
+15.06.2026 09:00 - Uhr
+Klasse BoundaryCondition getestet. Klasse Geometry erstellt. Alles von K zu °C geändert. Angefangen mit lösen. Morgen weitermachen und schauen, dass alle Neumann b.c. automatisch auch zur weak form hinzugefügt werden.
