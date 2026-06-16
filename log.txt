@@ -34,3 +34,7 @@ Recherche best practice Python Code schreiben, Klasse Parameter kommentiert und 
 
 15.06.2026 09:00 - Uhr
 Klasse BoundaryCondition getestet. Klasse Geometry erstellt. Alles von K zu °C geändert. Angefangen mit lösen. Morgen weitermachen und schauen, dass alle Neumann b.c. automatisch auch zur weak form hinzugefügt werden.
+
+16.06.2026 09:30 - 16:00 Uhr
+solve_system weitergeschrieben, Probleme bei T_int, das will irgendwie nicht so wie ich will. Ich wähle jetzt einfach mal rho = rho_w und schaue, ob das dann besser klappt. Das muss dann evtl nochmal geändert werden...
+Das klappt noch nicht, weil ich immer eine Funktion für die symbolische und eine für die numerische Auswertung schreiben muss, für das Update von phi. Das muss ich jetzt noch für Se, theta, W_SSa machen und dann müsste das zumindest passen. Das mach ich dann morgen. Außerdem fehlt immer noch das mit den boundary conditions, aber das mach ich dann, wenn ich es in eine Funktion schreibe.

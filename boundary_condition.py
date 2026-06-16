@@ -70,14 +70,15 @@ class BoundaryCondition:
             marker = values["marker"]
             if values["name"] == "Dirichlet":
                 V = values["functionspace"]
-                u_D = fem.Function(V)
-                if callable(values["value"]):
-                    u_D.interpolate(values["value"])
-                else:
-                    u_D.x.array[:] = fem.Constant(
-                        self.domain, PETSc.ScalarType(values["value"]))
                 dofsD = fem.locate_dofs_geometrical(V, self.boundaries[marker])
-                bc = fem.dirichletbc(u_D, dofsD)
+                if callable(values["value"]):
+                    u_D = fem.Function(V)
+                    u_D.interpolate(values["value"])
+                    bc = fem.dirichletbc(u_D, dofsD)
+                else:
+                    u_D = fem.Constant(self.domain,
+                                      PETSc.ScalarType(values["value"]))
+                    bc = fem.dirichletbc(u_D, dofsD, V)                
             elif values["name"] == "Neumann":
                 bc = values["testfunction"]*values["value"]*self.ds(marker)
             else:

@@ -48,6 +48,7 @@ class Parameter:
 
         # snow/van Genuchten parameters
         if layer_params is not None:
+            self.is_layered = True
             param_fct = self._assign_material(domain, layer_params)
             self.d_i = param_fct["d_i"]
             self.rho_s = param_fct["rho_s"]
@@ -56,6 +57,7 @@ class Parameter:
             self.alpha = param_fct["alpha"]
             self.N = param_fct["N"]
         else:  # homogeneous snow
+            self.is_layered = False
             self.d_i = fem.Constant(domain, PETSc.ScalarType(3e-4))  # m
             self.r_i = fem.Constant(domain,
                                     PETSc.ScalarType(0.06*self.d_i.value))  # m
@@ -162,9 +164,10 @@ class Parameter:
                 * ufl.exp(-0.013*self.rho_i*(1-phi))
                 * self.rho_w*self.g/self.mu_w)
 
-    def T_int(self, T_i, T_w, T_intold):
+    def T_int(self, T_i, T_w, T_intold=None):
         """Calculate the interface temperature after Moure et al. (2023)."""
-        rho = ufl.conditional(T_w < T_intold, self.rho_w, self.rho_i)
+        #rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
+        rho = self.rho_w
         numerator = (self.K_i/self.r_i*T_i
                      + self.K_w/self.r_w*T_w
                      + rho*self.L_sol*self.R_m*self.T_melt)
@@ -178,7 +181,27 @@ class Parameter:
         part1 = self.theta(Se, phi) * ufl.ln(phi)
         phi0 = 1 - self.rho_s/self.rho_i
         return part1*self.SSA_0 / (phi0*ufl.ln(phi0))
+    
+    def T_int_numerical(self, T_i, T_w):
+        """Numerical evaluation of T_int (as opposed to the symbolic one)."""
+        rho = self.rho_w.value
+        if self.is_layered:
+            ri = np.array(self.r_i.x.array)
+            rw = np.array(self.r_w.x.array)
+        else:
+            ri = self.r_i.value
+            rw = self.r_w.value
+        weights = [self.K_i.value/ri,
+                   self.K_w.value/rw, 
+                   rho*self.L_sol.value*self.R_m.value]
+        numerator = (weights[0]*np.array(T_i.x.array)
+                     + weights[1]*np.array(T_w.x.array)
+                     + weights[2]*self.T_melt.value)
+        denominator = (weights[0] + weights[1] + weights[2])
+        return numerator/denominator
 
+    def W_SSA_numerical(self, Se, phi):
+        pass
 
 """ from dolfinx import mesh
 

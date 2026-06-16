@@ -3,17 +3,75 @@ from parametrizations import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
-from dolfinx import fem
-from dolfinx.fem.petsc import create_matrix, create_vector
+from dolfinx.fem import (
+    functionspace,
+    Function,
+    Constant,
+    form,
+)
+from dolfinx.fem.petsc import (
+    create_matrix, create_vector,
+    assemble_matrix, assemble_vector,
+    apply_lifting, set_bc,
+    LinearProblem,
+)
 from ufl import (
-    grad, dx, dot, SpatialCoordinate, TestFunction, TrialFunction,
+    grad, dx, dot,
+    SpatialCoordinate, TestFunction, TrialFunction,
+    rhs, lhs,
 )
 from petsc4py import PETSc
+import pickle
+
+
+def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
+    repeat_time_step = False
+    h_w.x.array[:] = h_w_old.x.array
+    snes.setFunction(problem.F, b)  # assemble residual
+    snes.setJacobian(problem.J, J)  # assemble Jacobian
+
+    # Set options
+    snes.setType("newtonls")
+    snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
+    snes.setTolerances(rtol=1e-4, atol=1e-11, max_it=20)
+    ksp = snes.getKSP()
+    ksp.setType("gmres")  # iterative solver
+    ksp.setTolerances(rtol=1e-4)
+    ksp.setErrorIfNotConverged(True)
+    ksp.getPC().setType(PETSc.PC.Type.HYPRE)
+    ksp.getPC().setHYPREType("boomeramg")
+
+    sol_vec = h_w.x.petsc_vec.copy()  # create solution vector
+    sol_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT,
+                        mode=PETSc.ScatterMode.FORWARD)
+    snes.solve(None, sol_vec)  # solve, store solution in solution vector
+
+    sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
+    h_w.x.scatter_forward()
+
+    converged = snes.getConvergedReason()
+    num_iter = snes.getIterationNumber()
+
+    # adaptive time stepping:
+    if num_iter > 10 and float(delta_t.value) > 1e-1:
+        delta_t.value = max(0.5*float(delta_t.value), 1e-1)
+        repeat_time_step = True
+        return h_w, repeat_time_step, delta_t
+
+    if num_iter < 3 and float(delta_t.value) < 3600:
+        delta_t.value = min(float(delta_t.value)*1.2, 3600)
+    assert converged > 0, f"Solver did not converge, got {converged}."
+    print(
+        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step is {delta_t.value:.2f} s at t={t/3600:.2f} hours."
+    )
+
+    return h_w, repeat_time_step, delta_t
+
 
 # Set up geometry
 height = 2
 length = 1
-delta_x = delta_z = 0.05
+delta_x = delta_z = 0.1
 nx = int(6/delta_x)
 nz = int(3/delta_x)
 print(
@@ -21,9 +79,14 @@ print(
 
 geom = Geometry(height, length, slope=0)
 domain = geom.make_domain(nx, nz)
-V = fem.functionspace(domain, ("CG", 1))
+V_hw = functionspace(domain, ("CG", 1))
+v_hw = TestFunction(V_hw)
+V_phi = functionspace(domain, ("CG", 1))
+V_Ti = functionspace(domain, ("CG", 1))
+v_Ti = TestFunction(V_Ti)
+V_Tw = functionspace(domain, ("CG", 1))
+v_Tw = TestFunction(V_Tw)
 x = SpatialCoordinate(domain)
-v = TestFunction(V)
 
 # Get parameters
 p = Parameter(domain)
@@ -36,80 +99,198 @@ boundaries = {
 bc_dict = {
     "top_hw": {
         "marker": 2, "name": "Dirichlet", "value": 1,
-        "functionspace": V, "testfunction": v},
+        "functionspace": V_hw, "testfunction": v_hw},
     "top_Ti": {
         "marker": 2, "name": "Dirichlet", "value": 0,
-        "functionspace": V, "testfunction": v},
+        "functionspace": V_Ti, "testfunction": v_Ti},
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0,
-        "functionspace": V, "testfunction": v},
+        "functionspace": V_Tw, "testfunction": v_Tw},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -5,
-        "functionspace": V, "testfunction": v}
+        "functionspace": V_Ti, "testfunction": v_Ti}
 }
 
 bc = BoundaryCondition(domain, boundaries)
 bcs = bc.make_boundary_condition(bc_dict)
 
 # Set up time iteration
-delta_t = fem.Constant(domain, PETSc.ScalarType(7))
+delta_t = Constant(domain, PETSc.ScalarType(7))
 T_end = 24*60*60
 t = 0.0
 
-# Create Newton solver
-snes = PETSc.SNES().create()
-
 # Initial conditions
-h_w_old = fem.Function(V)
+h_w_old = Function(V_hw)
 h_w_old.name = "h_w_old"
 h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
 
-phi_old = fem.Function(V)
+phi_old = Function(V_phi)
 phi_old.name = "phi_old"
-phi_old.x.array[:] = 0.468
+phi_old.x.array[:] = 0.468*np.ones_like(phi_old.x.array)
 
-T_i_old = fem.Function(V)
+T_i_old = Function(V_Ti)
 T_i_old.name = "T_i_old"
-T_i_old.x.array[:] = -5
+T_i_old.x.array[:] = -5*np.ones_like(T_i_old.x.array)
 
-T_w_old = fem.Function(V)
+T_w_old = Function(V_Tw)
 T_w_old.name = "T_w_old"
-T_w_old.x.array[:] = 0
+T_w_old.x.array[:] = np.zeros_like(T_w_old.x.array)
 
-T_intold = p.T_int(T_i_old, T_w_old, -1)  # ????
+h_w1 = Function(V_hw)
+phi1 = Function(V_phi)
+
 
 # Trial functions
-h_w = fem.Function(V)
-phi = fem.Function(V)
-T_i = fem.Function(V)
-T_w = fem.Function(V)
+h_w = Function(V_hw)
+phi = Function(V_phi)
+T_i = TrialFunction(V_Ti)
+T_w = TrialFunction(V_Tw)
+# Create intermediate solution functions
+T_i_h = Function(V_Ti)
+T_w_h = Function(V_Tw)
 
 # Weak formulation
-F_hw = (
-    v * (p.theta(p.S_e(h_w), phi) -
-         p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
-    + dot(grad(v), (p.K_s(phi_old)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
-    - v*p.rho_i/p.rho_w*p.R_m *
-        (p.T_int(T_i_old, T_w_old, T_intold) - p.T_melt) *
-    p.W_SSA(p.S_e(h_w_old), phi_old)*dx
+F_hw1 = (
+    v_hw * (p.theta(p.S_e(h_w), phi_old) -
+            p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
+    + dot(grad(v_hw), (p.K_s(phi_old)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+    - v_hw*p.rho_i/p.rho_w*p.R_m *
+    (p.T_int(T_i_old, T_w_old) - p.T_melt)*p.W_SSA(p.S_e(h_w_old), phi_old)*dx
 )
+
+F_hw2 = (
+    v_hw * (p.theta(p.S_e(h_w), phi1) -
+            p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
+    + dot(grad(v_hw), (p.K_s(phi1)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+    - v_hw*p.rho_i/p.rho_w*p.R_m *
+        (p.T_int(T_i_h, T_w_h)-p.T_melt)*p.W_SSA(p.S_e(h_w1), phi1)*dx
+)
+
 F_Ti = (
-    v * (1-phi)*(T_i - T_i_old)/delta_t * dx
-    + dot(grad(v), p.D_i*(1-phi)*grad(T_i)) * dx
-    - v*p.D_i*p.W_SSA(p.S_e(h_w), phi) *
-    (p.T_int(T_i_old, T_w_old, T_intold)-T_i)/p.r_i * dx
+    v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
+    + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
+    - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) * (p.T_int(T_i_old, T_w_old)-T_i)/p.r_i * dx
 )
 
 F_Tw = (
-    v * p.theta(p.S_e(h_w), phi)*(T_w - T_w_old)/delta_t * dx
-    + dot(grad(v), (p.D_w*p.theta(p.S_e(h_w), phi)*grad(T_w)
-                    + p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)*T_w)) * dx
-    - v*p.D_w*p.W_SSA(p.S_e(h_w), phi) *
-    (p.T_int(T_i_old, T_w_old, T_intold) - T_w)/p.r_w * dx
+    v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
+    + dot(grad(v_Tw), (p.D_w*p.theta(p.S_e(h_w1), phi1)*grad(T_w)
+                       + p.K_s(phi1)*p.k_rel(p.S_e(h_w1))*grad(x[1]+h_w1)*T_w)) * dx
+    - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) * (p.T_int(T_i_old, T_w_old) - T_w)/p.r_w * dx
 )
 
-problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bcs["top_hw"])
-b_hw = create_vector(V)
-J_hw = create_matrix(problem_hw.a)
+# Create Newton solver
+snes1 = PETSc.SNES().create()
+snes2 = PETSc.SNES().create()
+# Set up nonlinear problem
+problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bcs["top_hw"])
+b_hw1 = create_vector(V_hw)
+J_hw1 = create_matrix(problem_hw1.a)
+problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bcs["top_hw"])
+b_hw2 = create_vector(V_hw)
+J_hw2 = create_matrix(problem_hw2.a)
 
-snes.destroy()
+# Set up linear solver options
+petsc_options = {
+    "ksp_error_if_not_converged": True,
+    "ksp_type": "gmres",
+    "ksp_rtol": 1e-4,
+    "ksp_atol": 1e-6,
+    "pc_type": "hypre",
+    "pc_hypre_type": "boomeramg",
+    "pc_hypre_boomeramg_max_iter": 1,
+    "pc_hypre_boomeramg_cycle_type": "v",
+}
+# Set up linear problem
+a_Ti = form(lhs(F_Ti))
+L_Ti = form(rhs(F_Ti))
+a_Tw = form(lhs(F_Tw))
+L_Tw = form(rhs(F_Tw))
+
+# Create structure for saving intermediate results
+tmp = {
+    "domain": domain,
+    "T_end": T_end,
+    "parameter": p,
+    "h_w": [],
+    "phi": [],
+    "T_i": [],
+    "T_w": [],
+    "T_int": [],
+    "times": [],
+}
+tmp["h_w"].append(h_w_old.x.array)
+tmp["phi"].append(phi_old.x.array)
+tmp["T_i"].append(T_i_old.x.array)
+tmp["T_w"].append(T_w_old.x.array)
+tmp["times"].append(t)
+next_saving_time = 3600
+
+# Time loop
+while t <= delta_t.value:
+    # Solve Richards
+    h_w1, repeat_time_step, delta_t = solve_Richards(
+        h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t)
+    if repeat_time_step:
+        continue
+
+    # Update porosity
+    phi1.x.array[:] = (
+        phi_old.x.array
+        + delta_t.value*p.R_m.value
+        *(p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
+        * p.W_SSA(p.S_e(h_w_old), phi_old))
+    print("Successfully updated phi")
+
+     # Solve Thermodynamics
+    problem_Ti = LinearProblem(
+        a_Ti, L_Ti, petsc_options=petsc_options, petsc_options_prefix="T_i")
+    T_i_h = problem_Ti.solve()
+    T_i_old.x.array[:] = T_i_h.x.array
+    problem_Tw = LinearProblem(
+        a_Tw, L_Tw, petsc_options=petsc_options, petsc_options_prefix="T_w")
+    T_w_h = problem_Tw.solve()
+    T_w_old.x.array[:] = T_w_h.x.array
+    print("successfully solved thermodynamics")
+
+    # Solve Richards again
+    h_w, repeat_time_step, delta_t = solve_Richards(
+        h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
+    # Update porosity
+    phi.x.array[:] = (
+        phi_old.x.array
+        + delta_t.value*p.R_m.value
+        *(p.T_int_numerical(T_i, T_w) - p.T_melt.value)
+        * p.W_SSA(p.S_e(h_w1), phi1))
+
+    # save temporary data
+    if True and t >= next_saving_time:
+        next_saving_time += 3600
+        tmp["h_w"].append(h_w.x.array.copy())
+        tmp["phi"].append(phi.x.array.copy())
+        tmp["T_i"].append(T_i.x.array.copy())
+        tmp["T_w"].append(T_w.x.array.copy())
+        tmp["times"].append(t)
+
+    h_w_old.x.array[:] = h_w.x.array
+    phi_old.x.array[:] = phi.x.array
+    t += float(delta_t.value)
+
+
+# Destroy PETSc objects
+snes1.destroy()
+snes2.destroy()
+b_hw1.destroy()
+J_hw1.destroy()
+b_hw2.destroy()
+J_hw2.destroy()
+
+""" # save final data
+tmp["h_w"].append(h_w.x.array.copy())
+tmp["times"].append(t)
+# dump temporary data into pickle file
+filename="./solutions/test.pkl"
+if filename is None: # set default filename
+    filename = "./solutions/heterogeneous_" + str(int(T_end/3600)) + "h_nx" + str(nx) + "_nz" + str(nz) + ".pkl"
+with open(filename, "wb") as f:
+    pickle.dump(tmp, f) """
