@@ -148,7 +148,8 @@ class Parameter:
 
     def theta(self, Se, phi):
         """Calculate the volumetric water content after van Genuchten."""
-        return self.theta_r + (0.9*phi-self.theta_r)*Se
+        t = self.theta_r + (0.9*phi-self.theta_r)*Se
+        return ufl.conditional(t <= 1, t, 1)
 
     def k_rel(self, Se):
         """Calculate the relative permeability after van Genuchten."""
@@ -166,7 +167,7 @@ class Parameter:
 
     def T_int(self, T_i, T_w, T_intold=None):
         """Calculate the interface temperature after Moure et al. (2023)."""
-        #rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
+        # rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
         rho = self.rho_w
         numerator = (self.K_i/self.r_i*T_i
                      + self.K_w/self.r_w*T_w
@@ -181,7 +182,29 @@ class Parameter:
         part1 = self.theta(Se, phi) * ufl.ln(phi)
         phi0 = 1 - self.rho_s/self.rho_i
         return part1*self.SSA_0 / (phi0*ufl.ln(phi0))
-    
+
+    def S_e_numerical(self, h_w):
+        """Numerical evaluation of the effective saturation after van Genuchten."""
+        hw = np.array(h_w.x.array)
+        Se = np.ones_like(hw)
+        if self.is_layered:
+            a = np.array(self.alpha.x.array)
+            n = np.array(self.N.x.array)
+            Se[hw < 0] = ((1 + (-a[hw < 0]*hw[hw < 0])**n[hw < 0])
+                          ** ((1-n[hw < 0])/n[hw < 0]))
+        else:
+            a = self.alpha.value
+            n = self.N.value
+            Se[hw < 0] = (1 + (-a*hw[hw < 0])**n) ** ((1-n)/n)
+        return Se
+
+    def theta_numerical(self, Se, phi):
+        """Numerical evaluation of the liquid water content."""
+        t = (self.theta_r.value
+             + (0.9*np.array(phi.x.array)-self.theta_r.value)*Se)
+        t[t > 1] = 1
+        return t
+
     def T_int_numerical(self, T_i, T_w):
         """Numerical evaluation of T_int (as opposed to the symbolic one)."""
         rho = self.rho_w.value
@@ -192,7 +215,7 @@ class Parameter:
             ri = self.r_i.value
             rw = self.r_w.value
         weights = [self.K_i.value/ri,
-                   self.K_w.value/rw, 
+                   self.K_w.value/rw,
                    rho*self.L_sol.value*self.R_m.value]
         numerator = (weights[0]*np.array(T_i.x.array)
                      + weights[1]*np.array(T_w.x.array)
@@ -201,19 +224,10 @@ class Parameter:
         return numerator/denominator
 
     def W_SSA_numerical(self, Se, phi):
-        pass
-
-""" from dolfinx import mesh
-
-msh = mesh.create_unit_square(MPI.COMM_WORLD, 10, 10)
-
-V = fem.functionspace(msh, ("CG", 1))
-h_w = fem.Function(V)
-h_w.x.array[:] = -0.1
-phi = fem.Function(V)
-phi.x.array[:] = 0.4
-layers = {1: {"d_i": 0.3e-3, "rho_s": 363, "locator": lambda x: True}}
-p = Parameter(domain=msh, layer_params=layers)
-S = p.S_e(h_w)
-t = p.T_int(S, phi, 15)
-print(type(t)) """
+        """Numerical evaluation of the wet specific surface area."""
+        part1 = self.theta_numerical(Se, phi)* np.log(np.array(phi.x.array))
+        if self.is_layered:
+            phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
+        else:
+            phi0 = 1 - self.rho_s.value/self.rho_i.value
+        return part1*self.SSA_0.value / (phi0*np.log(phi0))

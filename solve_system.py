@@ -18,7 +18,7 @@ from dolfinx.fem.petsc import (
 from ufl import (
     grad, dx, dot,
     SpatialCoordinate, TestFunction, TrialFunction,
-    rhs, lhs,
+    rhs, lhs, system,
 )
 from petsc4py import PETSc
 import pickle
@@ -58,14 +58,32 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
         repeat_time_step = True
         return h_w, repeat_time_step, delta_t
 
-    if num_iter < 3 and float(delta_t.value) < 3600:
-        delta_t.value = min(float(delta_t.value)*1.2, 3600)
+    #if num_iter < 3 and float(delta_t.value) < 3600:
+     #   delta_t.value = min(float(delta_t.value)*1.2, 3600)
     assert converged > 0, f"Solver did not converge, got {converged}."
     print(
         f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step is {delta_t.value:.2f} s at t={t/3600:.2f} hours."
     )
 
     return h_w, repeat_time_step, delta_t
+
+
+def validate_state(h_w, phi, T_i, T_w, label="State"):
+    print(f"\n{label} validation:")
+    print(
+        f"  h_w: min={h_w.x.array.min():.3e}, max={h_w.x.array.max():.3e}, NaN={np.any(np.isnan(h_w.x.array))}")
+    print(
+        f"  phi: min={phi.x.array.min():.3e}, max={phi.x.array.max():.3e}, NaN={np.any(np.isnan(phi.x.array))}")
+    print(
+        f"  T_i: min={T_i.x.array.min():.3e}, max={T_i.x.array.max():.3e}, NaN={np.any(np.isnan(T_i.x.array))}")
+    print(
+        f"  T_w: min={T_w.x.array.min():.3e}, max={T_w.x.array.max():.3e}, NaN={np.any(np.isnan(T_w.x.array))}")
+    assert not np.any(np.isnan(h_w.x.array)), "NaN in h_w"
+    assert not np.any(np.isnan(phi.x.array)), "NaN in phi"
+    assert not np.any(np.isnan(T_i.x.array)), "NaN in T_i"
+    assert not np.any(np.isnan(T_w.x.array)), "NaN in T_w"
+    assert np.all(phi.x.array >= 0), "phi < 0"
+    assert np.all(phi.x.array <= 1), "phi > 1"
 
 
 # Set up geometry
@@ -169,14 +187,16 @@ F_hw2 = (
 F_Ti = (
     v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
     + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
-    - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) * (p.T_int(T_i_old, T_w_old)-T_i)/p.r_i * dx
+    - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
+    (p.T_int(T_i_old, T_w_old)-T_i)/p.r_i * dx
 )
 
 F_Tw = (
     v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
     + dot(grad(v_Tw), (p.D_w*p.theta(p.S_e(h_w1), phi1)*grad(T_w)
                        + p.K_s(phi1)*p.k_rel(p.S_e(h_w1))*grad(x[1]+h_w1)*T_w)) * dx
-    - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) * (p.T_int(T_i_old, T_w_old) - T_w)/p.r_w * dx
+    - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) *
+    (p.T_int(T_i_old, T_w_old) - T_w)/p.r_w * dx
 )
 
 # Create Newton solver
@@ -202,10 +222,8 @@ petsc_options = {
     "pc_hypre_boomeramg_cycle_type": "v",
 }
 # Set up linear problem
-a_Ti = form(lhs(F_Ti))
-L_Ti = form(rhs(F_Ti))
-a_Tw = form(lhs(F_Tw))
-L_Tw = form(rhs(F_Tw))
+a_Ti, L_Ti = system(F_Ti)
+a_Tw, L_Tw = system(F_Tw)
 
 # Create structure for saving intermediate results
 tmp = {
@@ -238,11 +256,13 @@ while t <= delta_t.value:
     phi1.x.array[:] = (
         phi_old.x.array
         + delta_t.value*p.R_m.value
-        *(p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
-        * p.W_SSA(p.S_e(h_w_old), phi_old))
+        * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
+        * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
+    # Ensure porosity stays between 0 and 1
+    phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
     print("Successfully updated phi")
 
-     # Solve Thermodynamics
+    # Solve Thermodynamics
     problem_Ti = LinearProblem(
         a_Ti, L_Ti, petsc_options=petsc_options, petsc_options_prefix="T_i")
     T_i_h = problem_Ti.solve()
@@ -256,12 +276,16 @@ while t <= delta_t.value:
     # Solve Richards again
     h_w, repeat_time_step, delta_t = solve_Richards(
         h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
+
     # Update porosity
     phi.x.array[:] = (
         phi_old.x.array
         + delta_t.value*p.R_m.value
-        *(p.T_int_numerical(T_i, T_w) - p.T_melt.value)
-        * p.W_SSA(p.S_e(h_w1), phi1))
+        * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
+        * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
+    # Ensure porosity stays between 0 and 1
+    phi.x.array[:] = np.clip(phi.x.array, 0, 1)
+    print("Correction step done.")
 
     # save temporary data
     if True and t >= next_saving_time:
@@ -274,6 +298,8 @@ while t <= delta_t.value:
 
     h_w_old.x.array[:] = h_w.x.array
     phi_old.x.array[:] = phi.x.array
+    validate_state(h_w_old, phi_old, T_i_h, T_w_h, label="After correction")
+
     t += float(delta_t.value)
 
 
