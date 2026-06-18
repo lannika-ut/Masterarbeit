@@ -58,7 +58,7 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
         repeat_time_step = True
         return h_w, repeat_time_step, delta_t
 
-    #if num_iter < 3 and float(delta_t.value) < 3600:
+    # if num_iter < 3 and float(delta_t.value) < 3600:
      #   delta_t.value = min(float(delta_t.value)*1.2, 3600)
     assert converged > 0, f"Solver did not converge, got {converged}."
     print(
@@ -73,17 +73,15 @@ def validate_state(h_w, phi, T_i, T_w, label="State"):
     print(
         f"  h_w: min={h_w.x.array.min():.3e}, max={h_w.x.array.max():.3e}, NaN={np.any(np.isnan(h_w.x.array))}")
     print(
-        f"  phi: min={phi.x.array.min():.3e}, max={phi.x.array.max():.3e}, NaN={np.any(np.isnan(phi.x.array))}")
+        f"  phi: min={phi.x.array.min():.3f}, max={phi.x.array.max():.3f}, NaN={np.any(np.isnan(phi.x.array))}")
     print(
-        f"  T_i: min={T_i.x.array.min():.3e}, max={T_i.x.array.max():.3e}, NaN={np.any(np.isnan(T_i.x.array))}")
+        f"  T_i: min={T_i.x.array.min():.3f}, max={T_i.x.array.max():.3f}, NaN={np.any(np.isnan(T_i.x.array))}")
     print(
-        f"  T_w: min={T_w.x.array.min():.3e}, max={T_w.x.array.max():.3e}, NaN={np.any(np.isnan(T_w.x.array))}")
+        f"  T_w: min={T_w.x.array.min():.3f}, max={T_w.x.array.max():.3f}, NaN={np.any(np.isnan(T_w.x.array))}")
     assert not np.any(np.isnan(h_w.x.array)), "NaN in h_w"
     assert not np.any(np.isnan(phi.x.array)), "NaN in phi"
     assert not np.any(np.isnan(T_i.x.array)), "NaN in T_i"
     assert not np.any(np.isnan(T_w.x.array)), "NaN in T_w"
-    assert np.all(phi.x.array >= 0), "phi < 0"
-    assert np.all(phi.x.array <= 1), "phi > 1"
 
 
 # Set up geometry
@@ -133,7 +131,7 @@ bc = BoundaryCondition(domain, boundaries)
 bcs = bc.make_boundary_condition(bc_dict)
 
 # Set up time iteration
-delta_t = Constant(domain, PETSc.ScalarType(7))
+delta_t = Constant(domain, PETSc.ScalarType(2))
 T_end = 24*60*60
 t = 0.0
 
@@ -227,9 +225,9 @@ a_Tw, L_Tw = system(F_Tw)
 
 # Create structure for saving intermediate results
 tmp = {
-    "domain": domain,
+    "geometry": geom.make_into_dict(),
     "T_end": T_end,
-    "parameter": p,
+    "parameter": p.make_into_dict(),
     "h_w": [],
     "phi": [],
     "T_i": [],
@@ -237,10 +235,10 @@ tmp = {
     "T_int": [],
     "times": [],
 }
-tmp["h_w"].append(h_w_old.x.array)
-tmp["phi"].append(phi_old.x.array)
-tmp["T_i"].append(T_i_old.x.array)
-tmp["T_w"].append(T_w_old.x.array)
+tmp["h_w"].append(h_w_old.x.array.copy())
+tmp["phi"].append(phi_old.x.array.copy())
+tmp["T_i"].append(T_i_old.x.array.copy())
+tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
 next_saving_time = 3600
 
@@ -253,11 +251,12 @@ while t <= delta_t.value:
         continue
 
     # Update porosity
-    phi1.x.array[:] = (
-        phi_old.x.array
-        + delta_t.value*p.R_m.value
-        * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
-        * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
+    source_term = (p.R_m.value
+                   * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
+                   * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
+    max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
+    source_term = np.clip(source_term, -max_source, max_source)
+    phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
     print("Successfully updated phi")
@@ -273,16 +272,18 @@ while t <= delta_t.value:
     T_w_old.x.array[:] = T_w_h.x.array
     print("successfully solved thermodynamics")
 
+    validate_state(h_w1, phi1, T_i_h, T_w_h, label="Before correction")
+
     # Solve Richards again
     h_w, repeat_time_step, delta_t = solve_Richards(
         h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
 
     # Update porosity
-    phi.x.array[:] = (
-        phi_old.x.array
-        + delta_t.value*p.R_m.value
-        * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
-        * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
+    source_term = (p.R_m.value
+                   * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
+                   * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
+    source_term = np.clip(source_term, -max_source, max_source)
+    phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi.x.array[:] = np.clip(phi.x.array, 0, 1)
     print("Correction step done.")
@@ -311,12 +312,10 @@ J_hw1.destroy()
 b_hw2.destroy()
 J_hw2.destroy()
 
-""" # save final data
+# save final data
 tmp["h_w"].append(h_w.x.array.copy())
 tmp["times"].append(t)
 # dump temporary data into pickle file
 filename="./solutions/test.pkl"
-if filename is None: # set default filename
-    filename = "./solutions/heterogeneous_" + str(int(T_end/3600)) + "h_nx" + str(nx) + "_nz" + str(nz) + ".pkl"
 with open(filename, "wb") as f:
-    pickle.dump(tmp, f) """
+    pickle.dump(tmp, f)

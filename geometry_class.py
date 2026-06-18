@@ -67,3 +67,15 @@ class Geometry:
             np.outer((1-xi)*eta, self.corner_points[3])
         )
         return domain
+
+    def make_into_dict(self):
+        """Store attributes into dictionnary."""
+        d = {}
+        for key, value in vars(self).items():
+            d[key] = value
+        return d
+    
+    def make_from_dict(self, d):
+        """Set attributes from dictionnary d (output of make_into_dict())."""
+        for key, value in d.items():
+            setattr(self, key, value)

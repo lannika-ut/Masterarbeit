@@ -39,7 +39,11 @@ Klasse BoundaryCondition getestet. Klasse Geometry erstellt. Alles von K zu °C 
 solve_system weitergeschrieben, Probleme bei T_int, das will irgendwie nicht so wie ich will. Ich wähle jetzt einfach mal rho = rho_w und schaue, ob das dann besser klappt. Das muss dann evtl nochmal geändert werden...
 Das klappt noch nicht, weil ich immer eine Funktion für die symbolische und eine für die numerische Auswertung schreiben muss, für das Update von phi. Das muss ich jetzt noch für Se, theta, W_SSa machen und dann müsste das zumindest passen. Das mach ich dann morgen. Außerdem fehlt immer noch das mit den boundary conditions, aber das mach ich dann, wenn ich es in eine Funktion schreibe.
 
-17.06.2026 08:15 - 09:15, 13:00 - Uhr
+17.06.2026 08:15 - 09:15, 13:00 - 15:30 Uhr
 Idee für die angepassten Randbedingungen: Man könnte für jede Variable (hw, Ti, Tw) jeweils ein Attribut, das die Dirichlet Bedingungen sammelt und eins, dass die aufaddierten Neumann Bedingungen sammelt speichern und das dann verwenden.
 Numerische Auswertung fertig geschrieben. Solver läuft jetzt eine Iteration durch, aber Porosität nimmt unrealistische Werte an und dann konvergiert es nicht mehr. Ich glaube Teil des Problems ist auf jeden Fall W_SSA, das wird halt super groß und dann ändert sich die porespace plötzlich sehr viel, vor allem wenn das dann noch mit einem großen Zeitschritt multipliziert wird, da gehts dann richtig ab...
 Irgendwie funktioniert jetzt noch nicht einmal mehr das isothermal Dings, also keine Ahnung was jetzt passiert ist, aber da mach ich dann morgen weiter. Ich hab das Gefühl, das updated sich gar nicht, es behauptet immer, dass es nach einer Iteration schon konvergiert.
+
+18.06.2026 08:30 - Uhr
+solve_system_isothermal funktioniert jetzt, aber der Schnee ist noch schlimmer als Boden, der braucht schon relativ hohe Anfangswerte, also z.B. mit -0.01 funktioniert es gar nicht, mit -0.3 m Anfangswert schon. Hab außerdem noch die Methoden make_into_dict und make_from_dict geschrieben um die Lösungen besser auslesen zu können. Isothermal solver in eine Funktion gepackt.
+Dann war ich sehr frustriert mit dem Gesamtsystem und hab mich ans Poster gesetzt und jetzt nochmal bei den Abbildungen die Schrift größer gemacht, bzw. die eine Abbildung nochmal neu erstellt.

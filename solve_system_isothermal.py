@@ -68,111 +68,126 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
     return h_w, repeat_time_step, delta_t
 
 
+def solve_system(
+        geom, delta_x, boundaries, bc_dict,
+        layer_params=None, delta_t=7, T_end=24*60*60,
+        save_tmp = False, filename=None):
+    nx = int(6/delta_x)
+    nz = int(3/delta_x)
+    print(f"Resolution is dx = dz = {delta_x} m, giving nx = {nx}, nz = {nz}")
+    domain = geom.make_domain(nx, nz)
+    V_hw = functionspace(domain, ("CG", 1))
+    v_hw = TestFunction(V_hw)
+    x = SpatialCoordinate(domain)
+    # Get parameters
+    p = Parameter(domain, layer_params)
+    bc = BoundaryCondition(domain, boundaries)
+    for d in bc_dict.values():
+        if d["variable"] == "h_w":
+            d["functionspace"] = V_hw
+            d["testfunction"] = v_hw
+    bcs = bc.make_boundary_condition(bc_dict)
 
-# Set up geometry
-height = 2
-length = 1
-delta_x = delta_z = 0.1
-nx = int(6/delta_x)
-nz = int(3/delta_x)
-print(
-    f"Resolution is dx = {delta_x} m, dz = {delta_z} m, giving nx = {nx}, nz = {nz}")
+    # Set up time iteration
+    delta_t = Constant(domain, PETSc.ScalarType(delta_t))
+    t = 0.0
 
-geom = Geometry(height, length, slope=0)
-domain = geom.make_domain(nx, nz)
-V_hw = functionspace(domain, ("CG", 1))
-v_hw = TestFunction(V_hw)
-x = SpatialCoordinate(domain)
+    # Initial conditions
+    h_w_old = Function(V_hw)
+    h_w_old.name = "h_w_old"
+    h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
+    phi = Function(V_hw)
+    phi.name = "phi"
+    phi.x.array[:] = 0.468*np.ones_like(phi.x.array)
 
-# Get parameters
-p = Parameter(domain)
+    # Trial function
+    h_w = Function(V_hw)
 
-# Set up boundary conditions
-boundaries = {
-    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 1)),
-    2: lambda x: np.isclose(x[1], 2),
-    3: lambda x: np.isclose(x[1], 0)}
-bc_dict = {
-    "top_hw": {
-        "marker": 2, "name": "Neumann", "value": -2e-9,
-        "functionspace": V_hw, "testfunction": v_hw},
-}
+    # Weak formulation
+    F_hw = (
+        v_hw * (p.theta(p.S_e(h_w), phi) -
+                p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
+        + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+        + bcs["top"]
+    )
 
-bc = BoundaryCondition(domain, boundaries)
-bcs = bc.make_boundary_condition(bc_dict)
+    # Create Newton solver
+    snes = PETSc.SNES().create()
+    # Set up nonlinear problem
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=bcs["side"])
+    b_hw = create_vector(V_hw)
+    J_hw = create_matrix(problem_hw.a)
 
-# Set up time iteration
-delta_t = Constant(domain, PETSc.ScalarType(7))
-T_end = 24*60*60
-t = 0.0
+    # Create structure for saving intermediate results
+    tmp = {
+        "geometry": geom.make_into_dict(),
+        "T_end": T_end,
+        "parameter": p.make_into_dict(),
+        "h_w": [],
+        "phi": phi.x.array.copy(),
+        "times": [],
+    }
+    tmp["h_w"].append(h_w_old.x.array.copy())
+    tmp["times"].append(t)
+    next_saving_time = 3600
 
-# Initial conditions
-h_w_old = Function(V_hw)
-h_w_old.name = "h_w_old"
-h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
-phi = Function(V_hw)
-phi.name = "phi"
-phi.x.array[:] = 0.468*np.ones_like(phi.x.array)
+    # Time loop
+    while t <= T_end:
+        # Solve Richards
+        h_w, repeat_time_step, delta_t = solve_Richards(
+            h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t)
+        if repeat_time_step:
+            continue
+        # save temporary data
+        if save_tmp and t >= next_saving_time:
+            next_saving_time += 3600
+            tmp["h_w"].append(h_w.x.array.copy())
+            tmp["times"].append(t)
 
-# Trial function
-h_w = Function(V_hw)
+        h_w_old.x.array[:] = h_w.x.array
+        t += float(delta_t.value)
 
-# Weak formulation
-F_hw = (
-    v_hw * (p.theta(p.S_e(h_w), phi) -
-            p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
-    + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
-    + (-2e-9) * v_hw * bc.ds(2)
-)
+    # Destroy PETSc objects
+    snes.destroy()
+    b_hw.destroy()
+    J_hw.destroy()
 
-
-# Create Newton solver
-snes = PETSc.SNES().create()
-# Set up nonlinear problem
-problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
-b_hw = create_vector(V_hw)
-J_hw = create_matrix(problem_hw.a)
-
-# Create structure for saving intermediate results
-tmp = {
-    "domain": domain,
-    "T_end": T_end,
-    "parameter": p,
-    "h_w": [],
-    "phi": phi.x.array,
-    "times": [],
-}
-tmp["h_w"].append(h_w_old.x.array)
-tmp["times"].append(t)
-next_saving_time = 3600
-
-# Time loop
-while t <= T_end:
-    # Solve Richards
-    h_w, repeat_time_step, delta_t = solve_Richards(
-        h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t)
-    if repeat_time_step:
-        continue
-
-    # save temporary data
-    if True and t >= next_saving_time:
-        next_saving_time += 3600
+    if save_tmp:
+        # save final data
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["times"].append(t)
+        # dump temporary data into pickle file
+        with open(filename, "wb") as f:
+            pickle.dump(tmp, f)
 
-    h_w_old.x.array[:] = h_w.x.array
-    t += float(delta_t.value)
+# Set up geometry
+height = 3
+length = 6
+slope = -1/6
+delta_x = 0.1
+geom = Geometry(height, length, slope=slope)
+[P0, P1, P2, P3] = geom.corner_points
+# Set up boundary conditions
+def on_dirichlet(x):
+    return np.logical_and(np.isclose(x[0], P1[0]), x[1] <= 0)
+
+def top(x):
+    return np.isclose(x[1], slope*x[0]+P3[1])
+
+boundaries = {
+    1: on_dirichlet,
+    2: top,
+}
+bc_dict = {
+    "top": {
+        "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
+    "side": {
+        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], 
+        "variable": "h_w"}
+}
+
+filename = "./solutions/pls_work.pkl"
+solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename)
 
 
-# Destroy PETSc objects
-snes.destroy()
-b_hw.destroy()
-J_hw.destroy()
 
-# save final data
-tmp["h_w"].append(h_w.x.array.copy())
-tmp["times"].append(t)
-# dump temporary data into pickle file
-filename="./solutions/test_isothermal.pkl"
-with open(filename, "wb") as f:
-    pickle.dump(tmp, f)

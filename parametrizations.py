@@ -46,16 +46,18 @@ class Parameter:
         self.D_i = fem.Constant(domain, PETSc.ScalarType(Di))
         self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))
 
+        self.layer_params_dict = layer_params
         # snow/van Genuchten parameters
         if layer_params is not None:
             self.is_layered = True
-            param_fct = self._assign_material(domain, layer_params)
+            param_fct = self._assign_material(domain)
             self.d_i = param_fct["d_i"]
             self.rho_s = param_fct["rho_s"]
             self.r_i = param_fct["r_i"]
             self.r_w = param_fct["r_w"]
             self.alpha = param_fct["alpha"]
             self.N = param_fct["N"]
+            self.layer_params_dict = layer_params
         else:  # homogeneous snow
             self.is_layered = False
             self.d_i = fem.Constant(domain, PETSc.ScalarType(3e-4))  # m
@@ -72,7 +74,7 @@ class Parameter:
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
         self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
 
-    def _assign_material(self, domain, layer_params):
+    def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
 
         Args:
@@ -104,7 +106,7 @@ class Parameter:
 
         for c, x in enumerate(midpoints):
             # Check in which layer the midpoint is and assign the corresponding parameters
-            for value in layer_params.values():
+            for value in self.layer_params_dict.values():
                 if value["locator"](x):
                     d_i_vals[c] = value["d_i"]
                     rho_s_vals[c] = value["rho_s"]
@@ -231,3 +233,16 @@ class Parameter:
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         return part1*self.SSA_0.value / (phi0*np.log(phi0))
+    
+    def make_into_dict(self):
+        """Store attributes into dictionnary."""
+        d = {}
+        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N"]
+        for key, value in vars(self).items():
+            if self.is_layered and key in p_layers:
+                d[key] = value.x.array
+            elif key != "is_layered" and key != "layer_params_dict":
+                d[key] = float(value.value)
+            else:
+                d[key] = value
+        return d
