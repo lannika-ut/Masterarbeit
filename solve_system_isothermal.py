@@ -186,8 +186,18 @@ bc_dict = {
         "variable": "h_w"}
 }
 
-filename = "./solutions/pls_work.pkl"
-solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename)
+layer_params = {
+    1: {
+        "d_i": 2.31e-4,
+        "rho_s": 387,
+        "locator": lambda x: x[1] >= slope*x[0] + P3[1]/2 - 1e-14},
+    2: {
+        "d_i": 4.21e-4,
+        "rho_s": 489,
+        "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14,}
+}
+filename = "./Masterarbeit/solutions/snow_heterogeneous.pkl"
+solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 
 

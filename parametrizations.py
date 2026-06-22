@@ -3,6 +3,7 @@ import numpy as np
 import ufl
 from dolfinx import fem, mesh
 from petsc4py import PETSc
+import inspect
 
 
 class Parameter:
@@ -243,6 +244,12 @@ class Parameter:
                 d[key] = value.x.array
             elif key != "is_layered" and key != "layer_params_dict":
                 d[key] = float(value.value)
-            else:
+            elif key != "layer_params_dict":
+                d[key] = value
+            if key == "layer_params_dict":
+                for k, val in value.items():
+                    funcString = str(inspect.getsourcelines(val["locator"])[0])
+                    funcString = funcString.strip("['\\n']").split(" = ")[0]
+                    val["locator"] = funcString
                 d[key] = value
         return d
