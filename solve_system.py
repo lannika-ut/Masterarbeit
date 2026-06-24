@@ -25,6 +25,7 @@ import pickle
 
 
 def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
+    new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
     snes.setFunction(problem.F, b)  # assemble residual
@@ -54,30 +55,27 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
 
     # adaptive time stepping:
     if num_iter > 10 and float(delta_t.value) > 1e-1:
-        delta_t.value = max(0.5*float(delta_t.value), 1e-1)
+        new_dt = max(0.5*float(delta_t.value), 1e-1)
         repeat_time_step = True
-        return h_w, repeat_time_step, delta_t
+        h_w.x.array[:] = h_w_old.x.array  # Reset to old state
+        return h_w, repeat_time_step, new_dt
 
-    # if num_iter < 3 and float(delta_t.value) < 3600:
-     #   delta_t.value = min(float(delta_t.value)*1.2, 3600)
+    if num_iter < 3 and float(delta_t.value) < 3600:
+        new_dt = min(float(delta_t.value)*1.2, 3600)
     assert converged > 0, f"Solver did not converge, got {converged}."
     print(
-        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step is {delta_t.value:.2f} s at t={t/3600:.2f} hours."
+        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step will be {new_dt:.2f} s at t={(t+new_dt)/3600:.2f} hours."
     )
 
-    return h_w, repeat_time_step, delta_t
+    return h_w, repeat_time_step, new_dt
 
 
 def validate_state(h_w, phi, T_i, T_w, label="State"):
     print(f"\n{label} validation:")
-    print(
-        f"  h_w: min={h_w.x.array.min():.3e}, max={h_w.x.array.max():.3e}, NaN={np.any(np.isnan(h_w.x.array))}")
-    print(
-        f"  phi: min={phi.x.array.min():.3f}, max={phi.x.array.max():.3f}, NaN={np.any(np.isnan(phi.x.array))}")
-    print(
-        f"  T_i: min={T_i.x.array.min():.3f}, max={T_i.x.array.max():.3f}, NaN={np.any(np.isnan(T_i.x.array))}")
-    print(
-        f"  T_w: min={T_w.x.array.min():.3f}, max={T_w.x.array.max():.3f}, NaN={np.any(np.isnan(T_w.x.array))}")
+    print(f"  h_w: min={h_w.x.array.min():.3e}, max={h_w.x.array.max():.3e}")
+    print(f"  phi: min={phi.x.array.min():.3f}, max={phi.x.array.max():.3f}")
+    print(f"  T_i: min={T_i.x.array.min():.3f}, max={T_i.x.array.max():.3f}")
+    print(f"  T_w: min={T_w.x.array.min():.3f}, max={T_w.x.array.max():.3f}")
     assert not np.any(np.isnan(h_w.x.array)), "NaN in h_w"
     assert not np.any(np.isnan(phi.x.array)), "NaN in phi"
     assert not np.any(np.isnan(T_i.x.array)), "NaN in T_i"
@@ -113,9 +111,6 @@ boundaries = {
     2: lambda x: np.isclose(x[1], 2),
     3: lambda x: np.isclose(x[1], 0)}
 bc_dict = {
-    "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 1,
-        "functionspace": V_hw, "testfunction": v_hw},
     "top_Ti": {
         "marker": 2, "name": "Dirichlet", "value": 0,
         "functionspace": V_Ti, "testfunction": v_Ti},
@@ -123,7 +118,7 @@ bc_dict = {
         "marker": 2, "name": "Dirichlet", "value": 0,
         "functionspace": V_Tw, "testfunction": v_Tw},
     "bottom_Ti": {
-        "marker": 3, "name": "Dirichlet", "value": -5,
+        "marker": 3, "name": "Dirichlet", "value": -1,
         "functionspace": V_Ti, "testfunction": v_Ti}
 }
 
@@ -131,14 +126,14 @@ bc = BoundaryCondition(domain, boundaries)
 bcs = bc.make_boundary_condition(bc_dict)
 
 # Set up time iteration
-delta_t = Constant(domain, PETSc.ScalarType(2))
+delta_t = Constant(domain, PETSc.ScalarType(7))
 T_end = 24*60*60
 t = 0.0
 
 # Initial conditions
 h_w_old = Function(V_hw)
 h_w_old.name = "h_w_old"
-h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
+h_w_old.x.array[:] = -0.22*np.ones_like(h_w_old.x.array)
 
 phi_old = Function(V_phi)
 phi_old.name = "phi_old"
@@ -146,7 +141,7 @@ phi_old.x.array[:] = 0.468*np.ones_like(phi_old.x.array)
 
 T_i_old = Function(V_Ti)
 T_i_old.name = "T_i_old"
-T_i_old.x.array[:] = -5*np.ones_like(T_i_old.x.array)
+T_i_old.x.array[:] = -1*np.ones_like(T_i_old.x.array)
 
 T_w_old = Function(V_Tw)
 T_w_old.name = "T_w_old"
@@ -201,10 +196,10 @@ F_Tw = (
 snes1 = PETSc.SNES().create()
 snes2 = PETSc.SNES().create()
 # Set up nonlinear problem
-problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bcs["top_hw"])
+problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=None)
 b_hw1 = create_vector(V_hw)
 J_hw1 = create_matrix(problem_hw1.a)
-problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bcs["top_hw"])
+problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=None)
 b_hw2 = create_vector(V_hw)
 J_hw2 = create_matrix(problem_hw2.a)
 
@@ -245,9 +240,10 @@ next_saving_time = 3600
 # Time loop
 while t <= delta_t.value:
     # Solve Richards
-    h_w1, repeat_time_step, delta_t = solve_Richards(
+    h_w1, repeat_time_step, new_dt = solve_Richards(
         h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t)
     if repeat_time_step:
+        delta_t.value = new_dt
         continue
 
     # Update porosity
@@ -255,7 +251,7 @@ while t <= delta_t.value:
                    * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
                    * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
     max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
-    source_term = np.clip(source_term, -max_source, max_source)
+    #source_term = np.clip(source_term, -max_source, max_source)
     phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
@@ -275,14 +271,14 @@ while t <= delta_t.value:
     validate_state(h_w1, phi1, T_i_h, T_w_h, label="Before correction")
 
     # Solve Richards again
-    h_w, repeat_time_step, delta_t = solve_Richards(
+    h_w, repeat_time_step, new_dt = solve_Richards(
         h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
 
     # Update porosity
     source_term = (p.R_m.value
                    * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
                    * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
-    source_term = np.clip(source_term, -max_source, max_source)
+    #source_term = np.clip(source_term, -max_source, max_source)
     phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi.x.array[:] = np.clip(phi.x.array, 0, 1)
@@ -299,8 +295,8 @@ while t <= delta_t.value:
 
     h_w_old.x.array[:] = h_w.x.array
     phi_old.x.array[:] = phi.x.array
-    validate_state(h_w_old, phi_old, T_i_h, T_w_h, label="After correction")
-
+    validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
+    delta_t.value = new_dt
     t += float(delta_t.value)
 
 
@@ -316,6 +312,6 @@ J_hw2.destroy()
 tmp["h_w"].append(h_w.x.array.copy())
 tmp["times"].append(t)
 # dump temporary data into pickle file
-filename="./solutions/test.pkl"
+filename = "./solutions/test1.pkl"
 with open(filename, "wb") as f:
     pickle.dump(tmp, f)

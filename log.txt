@@ -53,3 +53,17 @@ Am Poster gearbeitet.
 
 22.06.2026 09:00 - 15:00 Uhr
 Poster. Außerdem rausgefunden, dass das so nicht klappt, wie ich S_e_numerical programmiert habe. Die DG0-Funktionen werten zellenweise aus, also auf nx*nz Zellen, während die CG1-Funktionen knotenweise auswerten, also (nx+1)*(nz+1)-mal. Das ist natürlich sehr ungeschickt.
+
+23.06.2026 08:30 - 16:30 Uhr
+Fragen/To do:
+adaptive time stepping in Richards-Korrektur -> nein und auch schauen, dass überall mit dem gleichen delta_t gerechnet wird, wenn das angepasst wird! (das ist jetzt gerade noch falsch) das hab ich jetzt angepasst
+Update von phi -> erstmal einfacheren Test Case testen (s.u.) und dann nochmal schauen, ob es andere Parametrisierungen für W_SSA gibt
+Poster korrigieren -> Termin mit Cirpka ausmachen für Posterbesprechung, Besprechung mit Anne nächsten Dienstag, aufs Poster soll außerdem auch noch die Methode (also finite Elemente) und evtl kann man das effects to consider noch weglassen
+Ergebnis isothermal -> ok.
+Weitere Ideen für einfachere Fälle:
+- Anfangsbedingung: paar % Sättigung überall, aber top boundary condition kein recharge/hw, sondern no-flow und dann mal schauen, außerdem T_i näher an T_w ran starten und Randbedingungen
+- wenn das auch nicht funktioniert, vielleicht isotherm mit einer bulk temperature (aufpassen mit Volumen, das ist ja dann Eis und Wasser zusammen)
+Am Poster gearbeitet. Kurz andere Ks-Werte getestet, Ergebnis war ganz anders, aber mit Anne besprochen, dass ich weiterhin bei der Parametrisierung bleibe. Anfangsbedingung und Randwerte geändert, aber das tuts gar nicht.
+
+24.06.2026 08:00 - 09:15, 13:00 - Uhr
+Poster fertig gemacht. Nochmal geänderte Randbedingungen probiert. Beim isothermischen funktioniert das problemlos, beim nicht isothermen konvergiert es schon beim ersten Mal nicht. Da ist ja zwar schon noch ein source term mit dabei, aber so doll kann das ja eigentlich nicht das beeinflussen...

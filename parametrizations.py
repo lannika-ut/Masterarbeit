@@ -228,13 +228,13 @@ class Parameter:
 
     def W_SSA_numerical(self, Se, phi):
         """Numerical evaluation of the wet specific surface area."""
-        part1 = self.theta_numerical(Se, phi)* np.log(np.array(phi.x.array))
+        part1 = self.theta_numerical(Se, phi) * np.log(np.array(phi.x.array))
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         return part1*self.SSA_0.value / (phi0*np.log(phi0))
-    
+
     def make_into_dict(self):
         """Store attributes into dictionnary."""
         d = {}
@@ -242,14 +242,15 @@ class Parameter:
         for key, value in vars(self).items():
             if self.is_layered and key in p_layers:
                 d[key] = value.x.array
-            elif key != "is_layered" and key != "layer_params_dict":
-                d[key] = float(value.value)
-            elif key != "layer_params_dict":
-                d[key] = value
-            if key == "layer_params_dict":
+            elif (key == "layer_params_dict" 
+                and self.layer_params_dict is not None):
                 for k, val in value.items():
                     funcString = str(inspect.getsourcelines(val["locator"])[0])
                     funcString = funcString.strip("['\\n']").split(" = ")[0]
                     val["locator"] = funcString
+                d[key] = value
+            elif key != "is_layered" and key != "layer_params_dict":
+                d[key] = float(value.value)
+            elif key != "layer_params_dict":
                 d[key] = value
         return d

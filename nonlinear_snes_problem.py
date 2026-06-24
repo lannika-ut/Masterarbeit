@@ -12,7 +12,14 @@ class NonlinearPDE_SNESProblem:
     """Nonlinear problem class for a PDE problem using SNES interface."""
 
     def __init__(self, F, u, bc):
-        """Initialize nonlinear PDE problem."""
+        """Initialize nonlinear PDE problem.
+
+        Args:
+            F (ufl problem): Residual of the problem. 
+            u (dolfinx.fem.Function): Trial function in form of a fem.Function of the problem.
+            bc (dolfinx dirichletbc): Dirichlet boundary conditions.
+        """
+        
         V = u.function_space
         du = ufl.TrialFunction(V)
         self.L = fem.form(F)

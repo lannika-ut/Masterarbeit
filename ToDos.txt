@@ -1,0 +1,20 @@
+To dos:
+Code
+- schauen, wie bei der numerischen Auswertung z.B. von Se mit den Parameterfunktionen umgegangen wird, also ob die auf CG1 interpoliert werden und dann an der Schichtgrenze halt einen Mittelwert annehmen, oder wie man das handhaben will
+- andere Randbedingungen: paar % Sättigung überall als Anfangsbedingung und dann Randbedingungen für Temperatur gleich lassen, nur Eistemperatur wärmer machen und für das Wasser oben keinen See drauf, sondern auch no-flow, dann sollte eigentlich nicht so mega viel passieren
+- isotherm mit bulk temperature ausprobieren, falls alles nicht funktioniert
+- solve_system aufräumen und in Funktionen verpacken, evtl sogar noch ne Klasse draus machen?
+- schauen, wie man boundary conditions flexibler machen kann, ohne explizit immer angeben zu müssen bcs["top"] z.B.
+- view_solutions flexibler machen
+
+Poster/Präsentation
+- Cirpka Poster schicken
+- überlegen, was ich dazu sagen will (elevator pitch 2 - 5 min)
+
+Report
+- finite Elemente richtig beschreiben
+- schauen, welche solver ich verwende und was genau die machen
+
+Theorie
+- andere Parametrisierungen von W_SSA?
+- andere Möglichkeiten den Code stabiler zu kriegen?

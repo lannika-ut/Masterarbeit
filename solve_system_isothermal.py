@@ -20,6 +20,7 @@ from ufl import (
     SpatialCoordinate, TestFunction, TrialFunction,
     rhs, lhs, system,
 )
+from dolfinx import mesh
 from petsc4py import PETSc
 import pickle
 
@@ -95,7 +96,7 @@ def solve_system(
     # Initial conditions
     h_w_old = Function(V_hw)
     h_w_old.name = "h_w_old"
-    h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
+    h_w_old.x.array[:] = -0.22*np.ones_like(h_w_old.x.array)
     phi = Function(V_hw)
     phi.name = "phi"
     phi.x.array[:] = 0.468*np.ones_like(phi.x.array)
@@ -114,7 +115,7 @@ def solve_system(
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=bcs["side"])
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -161,29 +162,30 @@ def solve_system(
             pickle.dump(tmp, f)
 
 # Set up geometry
-height = 3
-length = 6
-slope = -1/6
+height = 2
+length = 1
+slope = 0
 delta_x = 0.1
 geom = Geometry(height, length, slope=slope)
 [P0, P1, P2, P3] = geom.corner_points
 # Set up boundary conditions
 def on_dirichlet(x):
     return np.logical_and(np.isclose(x[0], P1[0]), x[1] <= 0)
+def sides(x): 
+    return np.logical_or(np.isclose(x[0], P0[0]), np.isclose(x[0], P1[0]))
 
 def top(x):
     return np.isclose(x[1], slope*x[0]+P3[1])
 
 boundaries = {
-    1: on_dirichlet,
+    1: sides,
     2: top,
 }
 bc_dict = {
     "top": {
-        "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
+        "marker": 2, "name": "Neumann", "value": 0, "variable": "h_w"},
     "side": {
-        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], 
-        "variable": "h_w"}
+        "marker": 1, "name": "Neumann", "value": 0, "variable": "h_w"}
 }
 
 layer_params = {
@@ -194,10 +196,10 @@ layer_params = {
     2: {
         "d_i": 4.21e-4,
         "rho_s": 489,
-        "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14,}
+        "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/snow_heterogeneous.pkl"
-solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
+filename = "./Masterarbeit/solutions/test_case.pkl"
+solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename)
 
 
 
