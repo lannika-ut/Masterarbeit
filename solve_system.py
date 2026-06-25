@@ -53,20 +53,19 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
     converged = snes.getConvergedReason()
     num_iter = snes.getIterationNumber()
 
-    # adaptive time stepping:
-    if num_iter > 10 and float(delta_t.value) > 1e-1:
-        new_dt = max(0.5*float(delta_t.value), 1e-1)
+    """ # adaptive time stepping:
+    if num_iter > 10 and float(delta_t.value) > 1e-2:
+        new_dt = max(0.5*float(delta_t.value), 1e-2)
         repeat_time_step = True
         h_w.x.array[:] = h_w_old.x.array  # Reset to old state
         return h_w, repeat_time_step, new_dt
 
-    if num_iter < 3 and float(delta_t.value) < 3600:
-        new_dt = min(float(delta_t.value)*1.2, 3600)
+    if num_iter < 3 and float(delta_t.value) < 60:
+        new_dt = min(float(delta_t.value)*1.2, 60) """
     assert converged > 0, f"Solver did not converge, got {converged}."
     print(
-        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step will be {new_dt:.2f} s at t={(t+new_dt)/3600:.2f} hours."
+        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step will be {new_dt:.2f} s at t={(t+new_dt)/60:.2f} minutes."
     )
-
     return h_w, repeat_time_step, new_dt
 
 
@@ -126,8 +125,8 @@ bc = BoundaryCondition(domain, boundaries)
 bcs = bc.make_boundary_condition(bc_dict)
 
 # Set up time iteration
-delta_t = Constant(domain, PETSc.ScalarType(7))
-T_end = 24*60*60
+delta_t = Constant(domain, PETSc.ScalarType(0.5))
+T_end = 5*60
 t = 0.0
 
 # Initial conditions
@@ -162,17 +161,17 @@ T_w_h = Function(V_Tw)
 
 # Weak formulation
 F_hw1 = (
-    v_hw * (p.theta(p.S_e(h_w), phi_old) -
+    v_hw * (p.theta(p.S_e(h_w), phi1) -
             p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
-    + dot(grad(v_hw), (p.K_s(phi_old)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+    + dot(grad(v_hw), (p.K_s(phi1)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
     - v_hw*p.rho_i/p.rho_w*p.R_m *
     (p.T_int(T_i_old, T_w_old) - p.T_melt)*p.W_SSA(p.S_e(h_w_old), phi_old)*dx
 )
 
 F_hw2 = (
-    v_hw * (p.theta(p.S_e(h_w), phi1) -
+    v_hw * (p.theta(p.S_e(h_w), phi) -
             p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
-    + dot(grad(v_hw), (p.K_s(phi1)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+    + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
     - v_hw*p.rho_i/p.rho_w*p.R_m *
         (p.T_int(T_i_h, T_w_h)-p.T_melt)*p.W_SSA(p.S_e(h_w1), phi1)*dx
 )
@@ -235,10 +234,20 @@ tmp["phi"].append(phi_old.x.array.copy())
 tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
-next_saving_time = 3600
+next_saving_time = 60
 
 # Time loop
-while t <= delta_t.value:
+while t <= T_end:
+    # Update porosity
+    source_term = (p.R_m.value
+                   * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
+                   * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
+    max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
+    source_term = np.clip(source_term, -max_source, max_source)
+    phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
+    # Ensure porosity stays between 0 and 1
+    phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
+
     # Solve Richards
     h_w1, repeat_time_step, new_dt = solve_Richards(
         h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t)
@@ -246,51 +255,38 @@ while t <= delta_t.value:
         delta_t.value = new_dt
         continue
 
-    # Update porosity
-    source_term = (p.R_m.value
-                   * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
-                   * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
-    max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
-    #source_term = np.clip(source_term, -max_source, max_source)
-    phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
-    # Ensure porosity stays between 0 and 1
-    phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
-    print("Successfully updated phi")
-
     # Solve Thermodynamics
     problem_Ti = LinearProblem(
-        a_Ti, L_Ti, petsc_options=petsc_options, petsc_options_prefix="T_i")
+        a_Ti, L_Ti, bcs=[bcs["top_Ti"], bcs["bottom_Ti"]], 
+        petsc_options=petsc_options, petsc_options_prefix="T_i")
     T_i_h = problem_Ti.solve()
     T_i_old.x.array[:] = T_i_h.x.array
     problem_Tw = LinearProblem(
-        a_Tw, L_Tw, petsc_options=petsc_options, petsc_options_prefix="T_w")
+        a_Tw, L_Tw, bcs=[bcs["top_Tw"]],
+        petsc_options=petsc_options, petsc_options_prefix="T_w")
     T_w_h = problem_Tw.solve()
     T_w_old.x.array[:] = T_w_h.x.array
-    print("successfully solved thermodynamics")
 
-    validate_state(h_w1, phi1, T_i_h, T_w_h, label="Before correction")
-
-    # Solve Richards again
-    h_w, repeat_time_step, new_dt = solve_Richards(
-        h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
-
-    # Update porosity
+    # Update porosity again 
     source_term = (p.R_m.value
                    * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
                    * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
-    #source_term = np.clip(source_term, -max_source, max_source)
+    source_term = np.clip(source_term, -max_source, max_source)
     phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi.x.array[:] = np.clip(phi.x.array, 0, 1)
-    print("Correction step done.")
+
+    # Solve Richards again
+    h_w, repeat_time_step, dontusethistimestep = solve_Richards(
+        h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
 
     # save temporary data
     if True and t >= next_saving_time:
-        next_saving_time += 3600
+        next_saving_time += 60
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["phi"].append(phi.x.array.copy())
-        tmp["T_i"].append(T_i.x.array.copy())
-        tmp["T_w"].append(T_w.x.array.copy())
+        tmp["T_i"].append(T_i_old.x.array.copy())
+        tmp["T_w"].append(T_w_old.x.array.copy())
         tmp["times"].append(t)
 
     h_w_old.x.array[:] = h_w.x.array
@@ -312,6 +308,6 @@ J_hw2.destroy()
 tmp["h_w"].append(h_w.x.array.copy())
 tmp["times"].append(t)
 # dump temporary data into pickle file
-filename = "./solutions/test1.pkl"
+filename = "./Masterarbeit/solutions/test1.pkl"
 with open(filename, "wb") as f:
     pickle.dump(tmp, f)

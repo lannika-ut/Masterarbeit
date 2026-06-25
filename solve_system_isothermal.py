@@ -96,7 +96,7 @@ def solve_system(
     # Initial conditions
     h_w_old = Function(V_hw)
     h_w_old.name = "h_w_old"
-    h_w_old.x.array[:] = -0.22*np.ones_like(h_w_old.x.array)
+    h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
     phi = Function(V_hw)
     phi.name = "phi"
     phi.x.array[:] = 0.468*np.ones_like(phi.x.array)
@@ -108,14 +108,14 @@ def solve_system(
     F_hw = (
         v_hw * (p.theta(p.S_e(h_w), phi) -
                 p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
-        + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w)))*dx
+        + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w))) * dx
         + bcs["top"]
     )
 
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=bcs["side"])
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -139,6 +139,7 @@ def solve_system(
             h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t)
         if repeat_time_step:
             continue
+        print(min(h_w.x.array), max(h_w.x.array))
         # save temporary data
         if save_tmp and t >= next_saving_time:
             next_saving_time += 3600
@@ -162,9 +163,9 @@ def solve_system(
             pickle.dump(tmp, f)
 
 # Set up geometry
-height = 2
-length = 1
-slope = 0
+height = 3
+length = 6
+slope = -1/6
 delta_x = 0.1
 geom = Geometry(height, length, slope=slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -178,14 +179,14 @@ def top(x):
     return np.isclose(x[1], slope*x[0]+P3[1])
 
 boundaries = {
-    1: sides,
+    1: on_dirichlet,
     2: top,
 }
 bc_dict = {
     "top": {
-        "marker": 2, "name": "Neumann", "value": 0, "variable": "h_w"},
+        "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
     "side": {
-        "marker": 1, "name": "Neumann", "value": 0, "variable": "h_w"}
+        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], "variable": "h_w"}
 }
 
 layer_params = {
@@ -198,8 +199,8 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/test_case.pkl"
-solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename)
+filename = "./Masterarbeit/solutions/test_isothermal_het.pkl"
+solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 
 

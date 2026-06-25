@@ -41,11 +41,11 @@ class Parameter:
 
         # Composite parameters
         Rm = self.c_pw.value / (self.beta_sol.value*self.L_sol.value)
-        self.R_m = fem.Constant(domain, PETSc.ScalarType(Rm))
+        self.R_m = fem.Constant(domain, PETSc.ScalarType(Rm))  # m/(s*°C)
         Di = self.K_i.value / (self.rho_i.value*self.c_pi.value)
         Dw = self.K_w.value / (self.rho_w.value*self.c_pw.value)
-        self.D_i = fem.Constant(domain, PETSc.ScalarType(Di))
-        self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))
+        self.D_i = fem.Constant(domain, PETSc.ScalarType(Di))  # m^2/2
+        self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))  # m^2/s
 
         self.layer_params_dict = layer_params
         # snow/van Genuchten parameters
@@ -74,6 +74,7 @@ class Parameter:
 
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
         self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
+        self.S_r = fem.Constant(domain, PETSc.ScalarType(1e-3))  # residual saturation
 
     def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
@@ -152,7 +153,7 @@ class Parameter:
     def theta(self, Se, phi):
         """Calculate the volumetric water content after van Genuchten."""
         t = self.theta_r + (0.9*phi-self.theta_r)*Se
-        return ufl.conditional(t <= 1, t, 1)
+        return t
 
     def k_rel(self, Se):
         """Calculate the relative permeability after van Genuchten."""
@@ -182,7 +183,7 @@ class Parameter:
 
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area. """
-        part1 = self.theta(Se, phi) * ufl.ln(phi)
+        part1 = (Se) * ufl.ln(phi) * phi
         phi0 = 1 - self.rho_s/self.rho_i
         return part1*self.SSA_0 / (phi0*ufl.ln(phi0))
 
@@ -205,7 +206,6 @@ class Parameter:
         """Numerical evaluation of the liquid water content."""
         t = (self.theta_r.value
              + (0.9*np.array(phi.x.array)-self.theta_r.value)*Se)
-        t[t > 1] = 1
         return t
 
     def T_int_numerical(self, T_i, T_w):
@@ -228,7 +228,8 @@ class Parameter:
 
     def W_SSA_numerical(self, Se, phi):
         """Numerical evaluation of the wet specific surface area."""
-        part1 = self.theta_numerical(Se, phi) * np.log(np.array(phi.x.array))
+        part1 = ((Se )*np.array(phi.x.array) *
+                 np.log(np.array(phi.x.array)))
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
         else:
@@ -242,8 +243,8 @@ class Parameter:
         for key, value in vars(self).items():
             if self.is_layered and key in p_layers:
                 d[key] = value.x.array
-            elif (key == "layer_params_dict" 
-                and self.layer_params_dict is not None):
+            elif (key == "layer_params_dict"
+                  and self.layer_params_dict is not None):
                 for k, val in value.items():
                     funcString = str(inspect.getsourcelines(val["locator"])[0])
                     funcString = funcString.strip("['\\n']").split(" = ")[0]

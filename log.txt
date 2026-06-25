@@ -61,9 +61,14 @@ Update von phi -> erstmal einfacheren Test Case testen (s.u.) und dann nochmal s
 Poster korrigieren -> Termin mit Cirpka ausmachen für Posterbesprechung, Besprechung mit Anne nächsten Dienstag, aufs Poster soll außerdem auch noch die Methode (also finite Elemente) und evtl kann man das effects to consider noch weglassen
 Ergebnis isothermal -> ok.
 Weitere Ideen für einfachere Fälle:
-- Anfangsbedingung: paar % Sättigung überall, aber top boundary condition kein recharge/hw, sondern no-flow und dann mal schauen, außerdem T_i näher an T_w ran starten und Randbedingungen
+- Anfangsbedingung: paar % Sättigung überall, aber top boundary condition kein recharge/hw, sondern no-flow und dann mal schauen, außerdem T_i näher an T_w ran starten und Randbedingungen entspannter T_i,bot = -1
 - wenn das auch nicht funktioniert, vielleicht isotherm mit einer bulk temperature (aufpassen mit Volumen, das ist ja dann Eis und Wasser zusammen)
 Am Poster gearbeitet. Kurz andere Ks-Werte getestet, Ergebnis war ganz anders, aber mit Anne besprochen, dass ich weiterhin bei der Parametrisierung bleibe. Anfangsbedingung und Randwerte geändert, aber das tuts gar nicht.
 
-24.06.2026 08:00 - 09:15, 13:00 - Uhr
+24.06.2026 08:00 - 09:15, 13:00 - 16:30 Uhr
 Poster fertig gemacht. Nochmal geänderte Randbedingungen probiert. Beim isothermischen funktioniert das problemlos, beim nicht isothermen konvergiert es schon beim ersten Mal nicht. Da ist ja zwar schon noch ein source term mit dabei, aber so doll kann das ja eigentlich nicht das beeinflussen...
+
+25.06.2026 08:15 - Uhr
+Poster. Dann nochmal zu finiten Elementen informiert.
+Vielleicht liegt das mit der Porosität daran, dass ich auch Se=0 zulasse und die anderen immer S>= 10^-3 annehmen. Daran liegt es anscheinend nicht, aber ich mach das jetzt trotzdem mal
+Äh also ich hatte das ja jetzt geändert und dann ist aber das isothermische nicht mehr konvergiert. Deswegen hab ich das jetzt doch wieder rückgängig gemacht... Aber ich hab im Code jetzt zuerst phi berechnet und damit dann hw und das funktioniert schonmal deutlich besser. phi wird zwar immer noch super klein, aber ich schaffe es jetzt immerhin schonmal für 1.4 Minuten zu simulieren. Ich fange aber auch mit einem super kleinen Zeitschritt an 0.01 s.
