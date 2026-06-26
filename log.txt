@@ -68,7 +68,11 @@ Am Poster gearbeitet. Kurz andere Ks-Werte getestet, Ergebnis war ganz anders, a
 24.06.2026 08:00 - 09:15, 13:00 - 16:30 Uhr
 Poster fertig gemacht. Nochmal geänderte Randbedingungen probiert. Beim isothermischen funktioniert das problemlos, beim nicht isothermen konvergiert es schon beim ersten Mal nicht. Da ist ja zwar schon noch ein source term mit dabei, aber so doll kann das ja eigentlich nicht das beeinflussen...
 
-25.06.2026 08:15 - Uhr
+25.06.2026 08:15 - 15:30 Uhr
 Poster. Dann nochmal zu finiten Elementen informiert.
 Vielleicht liegt das mit der Porosität daran, dass ich auch Se=0 zulasse und die anderen immer S>= 10^-3 annehmen. Daran liegt es anscheinend nicht, aber ich mach das jetzt trotzdem mal
 Äh also ich hatte das ja jetzt geändert und dann ist aber das isothermische nicht mehr konvergiert. Deswegen hab ich das jetzt doch wieder rückgängig gemacht... Aber ich hab im Code jetzt zuerst phi berechnet und damit dann hw und das funktioniert schonmal deutlich besser. phi wird zwar immer noch super klein, aber ich schaffe es jetzt immerhin schonmal für 1.4 Minuten zu simulieren. Ich fange aber auch mit einem super kleinen Zeitschritt an 0.01 s.
+Jetzt habe ich was, was funktioniert. Ich habe den Zeitschritt konstant auf 0.5 s gelassen und dann für fünf Minuten simuliert. Es kommt wirklich ein komisches Ergebnis raus, aber es ist brav durchgelaufen, also sehe ich das erstmal als Erfolg an haha. Jetzt lass ich es bleiben. Morgen sollte ich schauen, warum das so komisch aussieht.
+
+16.06.2026 08:00 - 12:00 Uhr
+Fehlersuche. Es liegt vermutlich irgendwie schon an der Physik, dass das so nicht hinhaut und die Porosität so stark ab/zunimmt.

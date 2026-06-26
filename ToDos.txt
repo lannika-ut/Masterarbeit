@@ -12,6 +12,7 @@ Poster/Präsentation
 Report
 - finite Elemente richtig beschreiben
 - schauen, welche solver ich verwende und was genau die machen
+- Pseudocode anpassen, ich berechne jetzt zurest phi und danach hw mit dem "neuen" phi
 
 Theorie
 - andere Parametrisierungen von W_SSA?

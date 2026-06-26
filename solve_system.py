@@ -140,7 +140,9 @@ phi_old.x.array[:] = 0.468*np.ones_like(phi_old.x.array)
 
 T_i_old = Function(V_Ti)
 T_i_old.name = "T_i_old"
-T_i_old.x.array[:] = -1*np.ones_like(T_i_old.x.array)
+def temp_gradient(x):
+    return x[1]/2-1
+T_i_old.interpolate(temp_gradient)
 
 T_w_old = Function(V_Tw)
 T_w_old.name = "T_w_old"
@@ -238,6 +240,27 @@ next_saving_time = 60
 
 # Time loop
 while t <= T_end:
+    # Diagnostics
+    Se = p.S_e_numerical(h_w_old)
+    Tint = p.T_int_numerical(T_i_old, T_w_old)
+    SSA = p.W_SSA_numerical(Se, phi_old)
+
+    raw = p.R_m.value * (Tint - p.T_melt.value) * SSA
+
+    print("----------------------")
+    print("Tint")
+    print(np.min(Tint), np.max(Tint))
+
+    print("SSA")
+    print(np.min(SSA), np.max(SSA))
+
+    print("Source")
+    print(np.min(raw), np.max(raw))
+
+    print("dt*Source")
+    print(np.min(delta_t.value*raw),
+        np.max(delta_t.value*raw))
+    
     # Update porosity
     source_term = (p.R_m.value
                    * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
@@ -308,6 +331,6 @@ J_hw2.destroy()
 tmp["h_w"].append(h_w.x.array.copy())
 tmp["times"].append(t)
 # dump temporary data into pickle file
-filename = "./Masterarbeit/solutions/test1.pkl"
+filename = "./Masterarbeit/solutions/full_5min_icetempgradient.pkl"
 with open(filename, "wb") as f:
     pickle.dump(tmp, f)
