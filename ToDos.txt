@@ -5,6 +5,8 @@ Code
 - solve_system aufräumen und in Funktionen verpacken, evtl sogar noch ne Klasse draus machen?
 - schauen, wie man boundary conditions flexibler machen kann, ohne explizit immer angeben zu müssen bcs["top"] z.B.
 - view_solutions flexibler machen
+- upwinding implementieren
+- porosity auch zu DG0 machen, ebenso source/sink term
 
 Poster/Präsentation
 - überlegen, was ich dazu sagen will (elevator pitch 2 - 5 min)

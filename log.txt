@@ -76,3 +76,10 @@ Jetzt habe ich was, was funktioniert. Ich habe den Zeitschritt konstant auf 0.5 
 
 16.06.2026 08:00 - 12:00 Uhr
 Fehlersuche. Es liegt vermutlich irgendwie schon an der Physik, dass das so nicht hinhaut und die Porosität so stark ab/zunimmt.
+
+29.06.2026 09:00 - 17:00 Uhr
+Besprechung mit Cirpka und Anne: upwinding doch nochmal probieren, weil es oszilliert. phi auch als DG0 und Quell- und Senkterm ebenfalls.
+Informiert nochmal zu finiten Elementen und Gleichungen für die Posterpräsentation. Poster angepasst, versucht results stetig darzustellen.
+
+30.06.2026 09:00 - 15:30 Uhr
+Poster fertig gemacht. Versucht upwinding zu implementieren. Ich glaube, das müsste eigentlich passen, aber jetzt konvergiert noch nicht mal mehr nur die Richards Gleichung. Ich glaube, es könnte eventuell daran liegen, dass das krel-Feld jetzt halt nicht mehr stetig ist und deswegen das Newton-Verfahren da Probleme hat. Weil vielleicht auch manche Zellen jetzt krel=1 haben, obwohl sie nur an einem Knoten gesättigt sind oder sowas... Na ja, da bin ich noch auf der Fehlersuche. Vielleicht versuch ich es auch nochmal mit Picard? Oder ich muss mir nochmal überlegen, wie das System jetzt eigentlich aussieht, vielleicht bekomm ich es ja doch noch irgendwie linearisiert...

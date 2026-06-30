@@ -8,6 +8,7 @@ from dolfinx.fem import (
     Function,
     Constant,
     form,
+    locate_dofs_geometrical,
 )
 from dolfinx.fem.petsc import (
     create_matrix, create_vector,
@@ -24,7 +25,6 @@ from dolfinx import mesh
 from petsc4py import PETSc
 import pickle
 
-
 def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -34,7 +34,7 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-11, max_it=20)
+    snes.setTolerances(rtol=1e-4, atol=1e-11, max_it=50)
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -68,7 +68,6 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
 
     return h_w, repeat_time_step, delta_t
 
-
 def solve_system(
         geom, delta_x, boundaries, bc_dict,
         layer_params=None, delta_t=7, T_end=24*60*60,
@@ -78,6 +77,7 @@ def solve_system(
     print(f"Resolution is dx = dz = {delta_x} m, giving nx = {nx}, nz = {nz}")
     domain = geom.make_domain(nx, nz)
     V_hw = functionspace(domain, ("CG", 1))
+    Q = functionspace(domain, ("DG", 0))
     v_hw = TestFunction(V_hw)
     x = SpatialCoordinate(domain)
     # Get parameters
@@ -88,12 +88,15 @@ def solve_system(
     t = 0.0
 
     # Initial conditions
+    h_w_ini = -0.3
     h_w_old = Function(V_hw)
     h_w_old.name = "h_w_old"
-    h_w_old.x.array[:] = -0.3*np.ones_like(h_w_old.x.array)
-    phi = Function(V_hw)
+    h_w_old.x.array[:] = h_w_ini*np.ones_like(h_w_old.x.array)
+    phi = Function(Q)
     phi.name = "phi"
     phi.x.array[:] = 0.468*np.ones_like(phi.x.array)
+    krel = Function(Q)
+    krel.name = "krel"
 
     # Trial function
     h_w = Function(V_hw)
@@ -102,7 +105,7 @@ def solve_system(
     F_hw = (
         v_hw * (p.theta(p.S_e(h_w), phi) -
                 p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
-        + dot(grad(v_hw), (p.K_s(phi)*p.k_rel(p.S_e(h_w))*grad(x[1]+h_w))) * dx
+        + dot(grad(v_hw), (p.K_s(phi)*krel*grad(x[1]+h_w))) * dx
     )
     # Boundary conditions
     bc = BoundaryCondition(domain, boundaries)
@@ -115,7 +118,7 @@ def solve_system(
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=bcs["saturation"])
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -127,36 +130,40 @@ def solve_system(
         "h_w": [],
         "phi": phi.x.array.copy(),
         "times": [],
+        "krel": [],
     }
     tmp["h_w"].append(h_w_old.x.array.copy())
     tmp["times"].append(t)
+    tmp["krel"].append(krel.x.array.copy())
     next_saving_time = 3600
 
     # Time loop
     while t <= T_end:
+        # upwind krel
+        new_krel = p.upwind_krel(h_w_old, domain)
+        krel.x.array[:] = new_krel.x.array
+        krel.x.scatter_forward()
         # Solve Richards
         h_w, repeat_time_step, delta_t = solve_Richards(
             h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t)
         if repeat_time_step:
             continue
+
         # save temporary data
         if save_tmp and t >= next_saving_time:
             next_saving_time += 3600
             tmp["h_w"].append(h_w.x.array.copy())
             tmp["times"].append(t)
+            tmp["krel"].append(krel.x.array.copy())
 
         h_w_old.x.array[:] = h_w.x.array
         t += float(delta_t.value)
-
-    # Destroy PETSc objects
-    snes.destroy()
-    b_hw.destroy()
-    J_hw.destroy()
 
     if save_tmp:
         # save final data
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["times"].append(t)
+        tmp["krel"].append(krel.x.array.copy())
         # dump temporary data into pickle file
         with open(filename, "wb") as f:
             pickle.dump(tmp, f)
@@ -184,6 +191,8 @@ boundaries = {
 bc_dict = {
     "top": {
         "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
+    "saturation": {
+        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], "variable": "h_w"},
 }
 
 layer_params = {
@@ -196,7 +205,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_all_Neumann.pkl"
+filename = "./Masterarbeit/solutions/isothermal_upwind.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

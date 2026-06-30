@@ -331,6 +331,6 @@ J_hw2.destroy()
 tmp["h_w"].append(h_w.x.array.copy())
 tmp["times"].append(t)
 # dump temporary data into pickle file
-filename = "./Masterarbeit/solutions/full_5min_icetempgradient.pkl"
-with open(filename, "wb") as f:
-    pickle.dump(tmp, f)
+#filename = "./Masterarbeit/solutions/full_5min_icetempgradient.pkl"
+#with open(filename, "wb") as f:
+ #   pickle.dump(tmp, f)

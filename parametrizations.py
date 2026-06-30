@@ -235,6 +235,56 @@ class Parameter:
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         return part1*self.SSA_0.value / (phi0*np.log(phi0))
+    
+    def calc_krel(self, hw, alpha, N):
+        """Calculate the relative permeability for a given pressure head.
+
+        Args:
+            hw (float): pressure head.
+            alpha (float): value of the van Genuchten parameter alpha.
+            N (float): value of the van Genuchten parameter N.
+        Returns:
+            float: value of the relative permeability.
+        """
+        m  = 1 - 1/N
+        Se = 1
+        krel = 1
+        if hw < 0:
+            Se = (1 + (-alpha*hw)**N) ** ((1-N)/N)
+            if Se < 1-1e-7:
+                krel = np.sqrt(Se) * (1 - (1-Se**(1/m))**m)**2
+        return krel
+    
+    def upwind_krel(self, hw, domain):
+        """Calculate the relative permeability in an upwind scheme, i.e. for each cell, take the h_w value of the cell's node where h_tot is the highest for calculating k_rel.
+
+        Args:
+            hw (dolfinx.fem.Function): Pressure head function.
+            domain (dolfinx.mesh.Mesh): The domain.
+
+        Returns:
+            dolfinx.fem.Function: DG0 function containing the upwind k_rel values.
+        """
+        Q = fem.functionspace(domain, ("DG", 0))
+        krel = fem.Function(Q)
+        # Find out which nodes belong to which element
+        tdim = domain.topology.dim
+        c2v = domain.topology.connectivity(tdim, 0) # element -> nodes
+        num_cells = domain.topology.index_map(tdim).size_local
+        cells = np.arange(num_cells, dtype=np.int32)
+        for cell in cells:
+            node_index = c2v.links(cell)
+            node_coords = domain.geometry.x[node_index]
+            h_tot = hw.x.array[node_index] + node_coords[:, 1] # h_tot = hw + z
+            max_hw = hw.x.array[node_index[np.argmax(h_tot)]]
+            if self.is_layered:
+                alpha = self.alpha.x.array[cell]
+                N = self.N.x.array[cell]
+            else:
+                alpha = self.alpha.value
+                N = self.N.value
+            krel.x.array[cell] = self.calc_krel(max_hw, alpha, N)
+        return krel
 
     def make_into_dict(self):
         """Store attributes into dictionnary."""

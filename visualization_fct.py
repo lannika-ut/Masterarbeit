@@ -195,4 +195,4 @@ def get_grid(P0, P1, P2, P3, nx, nz):
     x_plot = (1 - x_int) * (1 - z_int) * P0[0] + x_int * (1 - z_int) * P1[0] + x_int * z_int * P2[0] + (1 - x_int) * z_int * P3[0]
     z_plot = (1 - x_int) * (1 - z_int) * P0[1] + x_int * (1 - z_int) * P1[1] + x_int * z_int * P2[1] + (1 - x_int) * z_int * P3[1]
 
-    return grid, x_plot, z_plot
+    return grid, x_grid, z_grid
