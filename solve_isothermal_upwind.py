@@ -25,7 +25,7 @@ from dolfinx import mesh
 from petsc4py import PETSc
 import pickle
 
-def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
+def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t, min_dt=1e-2):
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
     snes.setFunction(problem.F, b)  # assemble residual
@@ -47,26 +47,37 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
                         mode=PETSc.ScatterMode.FORWARD)
     snes.solve(None, sol_vec)  # solve, store solution in solution vector
 
+    converged = snes.getConvergedReason()
+    num_iter = snes.getIterationNumber()
+    if converged <= 0:
+        # Newton actually failed (not just "slow") -> always halve dt,
+        # no floor check here.
+        if float(delta_t.value) <= min_dt:
+            raise RuntimeError(
+                f"Solver failed to converge (reason {converged}) even at "
+                f"the minimum time step {min_dt} s, t={t/3600:.2f} h."
+            )
+        delta_t.value = max(0.5*float(delta_t.value), min_dt)
+        print(f"Newton diverged (reason {converged}), halving dt to "
+              f"{delta_t.value:.4f} s and retrying t={t/3600:.2f} h.")
+        return h_w, True, delta_t
+    
     sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
     h_w.x.scatter_forward()
 
-    converged = snes.getConvergedReason()
-    num_iter = snes.getIterationNumber()
-
-    # adaptive time stepping:
-    if num_iter > 10 and float(delta_t.value) > 1e-1:
-        delta_t.value = max(0.5*float(delta_t.value), 1e-1)
-        repeat_time_step = True
-        return h_w, repeat_time_step, delta_t
+    # Converged, but check if it was "slow" and should shrink dt anyway
+    if num_iter > 10 and float(delta_t.value) > min_dt:
+        delta_t.value = max(0.5*float(delta_t.value), min_dt)
+        return h_w, True, delta_t
 
     if num_iter < 3 and float(delta_t.value) < 3600:
         delta_t.value = min(float(delta_t.value)*1.2, 3600)
-    assert converged > 0, f"Solver did not converge, got {converged}."
-    print(
-        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step is {delta_t.value:.2f} s at t={t/3600:.2f} hours."
-    )
 
-    return h_w, repeat_time_step, delta_t
+    print(
+        f"Solver converged after {num_iter} iterations, reason {converged}. "
+        f"dt = {delta_t.value:.2f} s at t={t/3600:.2f} h."
+    )
+    return h_w, False, delta_t
 
 def solve_system(
         geom, delta_x, boundaries, bc_dict,
@@ -118,7 +129,7 @@ def solve_system(
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=bcs["saturation"])
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -157,6 +168,7 @@ def solve_system(
             tmp["krel"].append(krel.x.array.copy())
 
         h_w_old.x.array[:] = h_w.x.array
+        h_w_old.x.scatter_forward()
         t += float(delta_t.value)
 
     if save_tmp:
@@ -191,8 +203,6 @@ boundaries = {
 bc_dict = {
     "top": {
         "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
-    "saturation": {
-        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], "variable": "h_w"},
 }
 
 layer_params = {
@@ -205,7 +215,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_upwind.pkl"
+filename = "./Masterarbeit/solutions/isothermal_upwind_Neumann.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

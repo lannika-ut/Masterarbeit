@@ -83,3 +83,6 @@ Informiert nochmal zu finiten Elementen und Gleichungen für die Posterpräsenta
 
 30.06.2026 09:00 - 15:30 Uhr
 Poster fertig gemacht. Versucht upwinding zu implementieren. Ich glaube, das müsste eigentlich passen, aber jetzt konvergiert noch nicht mal mehr nur die Richards Gleichung. Ich glaube, es könnte eventuell daran liegen, dass das krel-Feld jetzt halt nicht mehr stetig ist und deswegen das Newton-Verfahren da Probleme hat. Weil vielleicht auch manche Zellen jetzt krel=1 haben, obwohl sie nur an einem Knoten gesättigt sind oder sowas... Na ja, da bin ich noch auf der Fehlersuche. Vielleicht versuch ich es auch nochmal mit Picard? Oder ich muss mir nochmal überlegen, wie das System jetzt eigentlich aussieht, vielleicht bekomm ich es ja doch noch irgendwie linearisiert...
+
+02.07.2026 09:30 - Uhr
+upwinding zum Laufen gebracht. Das Problem war wieder mal nur die Anfangsbedingung, die in diesem Fall einfach zu trocken war. Wenn man sie für Neumann+Dirichlet auf -0.22 m setzt, funktioniert es aber gut und ich hab keine Oszillationen mehr.

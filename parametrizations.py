@@ -145,9 +145,10 @@ class Parameter:
 
     def S_e(self, h_w):
         """Calculate the effective saturation after van Genuchten."""
+        h_w_neg = ufl.min_value(h_w, -1e-8)
         return ufl.conditional(
             h_w < 0,
-            (1 + (-self.alpha*h_w)**self.N) ** ((1-self.N)/self.N),
+            (1 + (-self.alpha*h_w_neg)**self.N) ** ((1-self.N)/self.N),
             1)
 
     def theta(self, Se, phi):
@@ -284,6 +285,7 @@ class Parameter:
                 alpha = self.alpha.value
                 N = self.N.value
             krel.x.array[cell] = self.calc_krel(max_hw, alpha, N)
+            krel.x.scatter_forward()
         return krel
 
     def make_into_dict(self):
