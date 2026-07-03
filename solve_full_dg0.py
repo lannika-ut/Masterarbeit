@@ -25,6 +25,7 @@ import pickle
 
 
 def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
+    min_dt = 1e-2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -47,24 +48,35 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
                         mode=PETSc.ScatterMode.FORWARD)
     snes.solve(None, sol_vec)  # solve, store solution in solution vector
 
+    converged = snes.getConvergedReason()
+    num_iter = snes.getIterationNumber()
+    if converged <= 0:
+        if float(delta_t.value) <= min_dt:
+            raise RuntimeError(
+                f"Solver failed to converge (reason {converged}) even at "
+                f"the minimum time step {min_dt} s, t={t/3600:.2f} h."
+            )
+        new_dt = max(0.5*float(delta_t.value), min_dt)
+        print(f"Newton diverged (reason {converged}), halving dt to "
+              f"{delta_t.value:.4f} s and retrying t={t/3600:.2f} h.")
+        repeat_time_step = True
+        return h_w, repeat_time_step, new_dt
+    
     sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
     h_w.x.scatter_forward()
 
-    converged = snes.getConvergedReason()
-    num_iter = snes.getIterationNumber()
-
-    """ # adaptive time stepping:
-    if num_iter > 10 and float(delta_t.value) > 1e-2:
-        new_dt = max(0.5*float(delta_t.value), 1e-2)
+    # Converged, but check if it was "slow" and should shrink dt anyway
+    if num_iter > 10 and float(delta_t.value) > min_dt:
+        new_dt = max(0.5*float(delta_t.value), min_dt)
         repeat_time_step = True
-        h_w.x.array[:] = h_w_old.x.array  # Reset to old state
         return h_w, repeat_time_step, new_dt
 
-    if num_iter < 3 and float(delta_t.value) < 60:
-        new_dt = min(float(delta_t.value)*1.2, 60) """
-    assert converged > 0, f"Solver did not converge, got {converged}."
+    if num_iter < 3 and float(delta_t.value) < 7:
+        new_dt = min(float(delta_t.value)*1.2, 7)
+
     print(
-        f"Solver converged after {num_iter} iterations with converged reason {converged}. Time step will be {new_dt:.2f} s at t={(t+new_dt)/60:.2f} minutes."
+        f"Solver converged after {num_iter} iterations, reason {converged}. "
+        f"dt = {delta_t.value:.2f} s at t={t/3600:.2f} h."
     )
     return h_w, repeat_time_step, new_dt
 
@@ -122,11 +134,12 @@ bc_dict = {
 }
 
 bc = BoundaryCondition(domain, boundaries)
-bcs = bc.make_boundary_condition(bc_dict)
+bcs, dontuse = bc.make_boundary_condition(bc_dict)
+print(bcs)
 
 # Set up time iteration
 delta_t = Constant(domain, PETSc.ScalarType(0.5))
-T_end = 5*60
+T_end = 24*60*60
 t = 0.0
 
 # Initial conditions
@@ -163,24 +176,26 @@ h_w1 = Function(V_hw)
 h_w1.name = "h_w1"
 phi1 = Function(Q)
 phi1.name = "phi1"
+# DG0 function needed for evaluation
 krel = Function(Q)
 krel.name = "krel"
+source_mass = Function(Q)
+source_mass.name = "source_mass"
+
 
 # Weak formulation
 F_hw1 = (
     v_hw * (p.theta(p.S_e(h_w), phi1) -
             p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
     + dot(grad(v_hw), (p.K_s(phi1)*krel*grad(x[1]+h_w)))*dx
-    - v_hw*p.rho_i/p.rho_w*p.R_m *
-    (p.T_int(T_i_old, T_w_old) - p.T_melt)*p.W_SSA(p.S_e(h_w_old), phi_old)*dx
+    - v_hw*p.rho_i/p.rho_w*source_mass*dx
 )
 
 F_hw2 = (
     v_hw * (p.theta(p.S_e(h_w), phi) -
             p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
     + dot(grad(v_hw), (p.K_s(phi)*krel*grad(x[1]+h_w)))*dx
-    - v_hw*p.rho_i/p.rho_w*p.R_m *
-        (p.T_int(T_i_h, T_w_h)-p.T_melt)*p.W_SSA(p.S_e(h_w1), phi1)*dx
+    - v_hw*p.rho_i/p.rho_w*source_mass*dx
 )
 
 F_Ti = (
@@ -243,42 +258,24 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
 tmp["k_rel"].append(krel.x.array.copy())
-next_saving_time = 60
+next_saving_time = 30*60
 
 # Time loop
 while t <= T_end:
-    # Diagnostics
-    Se = p.S_e_numerical(h_w_old)
-    Tint = p.T_int_numerical(T_i_old, T_w_old)
-    SSA = p.W_SSA_numerical(Se, phi_old)
-
-    raw = p.R_m.value * (Tint - p.T_melt.value) * SSA
-
-    print("----------------------")
-    print("Tint")
-    print(np.min(Tint), np.max(Tint))
-
-    print("SSA")
-    print(np.min(SSA), np.max(SSA))
-
-    print("Source")
-    print(np.min(raw), np.max(raw))
-
-    print("dt*Source")
-    print(np.min(delta_t.value*raw),
-        np.max(delta_t.value*raw))
     
     # Upwind krel
     new_krel = p.upwind_krel(h_w_old, domain)
     krel.x.array[:] = new_krel.x.array
     krel.x.scatter_forward()
 
+    # Calculate source term
+    new_source = p.calc_source_term(h_w_old, phi_old, T_i_old, T_w_old)
+    source_mass.x.array[:] = new_source.x.array
+    source_mass.x.scatter_forward()
+
     # Update porosity
-    source_term = (p.R_m.value
-                   * (p.T_int_numerical(T_i_old, T_w_old) - p.T_melt.value)
-                   * p.W_SSA_numerical(p.S_e_numerical(h_w_old), phi_old))
     max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
-    source_term = np.clip(source_term, -max_source, max_source)
+    source_term = np.clip(source_mass.x.array, -max_source, max_source)
     phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
@@ -306,11 +303,13 @@ while t <= T_end:
     T_w_h = problem_Tw.solve()
     T_w_old.x.array[:] = T_w_h.x.array
 
+    # Update source term with new values
+    new_source = p.calc_source_term(h_w1, phi1, T_i_h, T_w_h)
+    source_mass.x.array[:] = new_source.x.array
+    source_mass.x.scatter_forward()
+
     # Update porosity again 
-    source_term = (p.R_m.value
-                   * (p.T_int_numerical(T_i_h, T_w_h) - p.T_melt.value)
-                   * p.W_SSA_numerical(p.S_e_numerical(h_w1), phi1))
-    source_term = np.clip(source_term, -max_source, max_source)
+    source_term = np.clip(source_mass.x.array, -max_source, max_source)
     phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
     # Ensure porosity stays between 0 and 1
     phi.x.array[:] = np.clip(phi.x.array, 0, 1)
@@ -321,16 +320,17 @@ while t <= T_end:
 
     # save temporary data
     if True and t >= next_saving_time:
-        next_saving_time += 60
+        next_saving_time += 30*60
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["phi"].append(phi.x.array.copy())
         tmp["T_i"].append(T_i_old.x.array.copy())
         tmp["T_w"].append(T_w_old.x.array.copy())
+        tmp["k_rel"].append(krel.x.array.copy())
         tmp["times"].append(t)
 
     h_w_old.x.array[:] = h_w.x.array
     phi_old.x.array[:] = phi.x.array
-    validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
+    #validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
     delta_t.value = new_dt
     t += float(delta_t.value)
 
@@ -345,8 +345,11 @@ J_hw2.destroy()
 
 # save final data
 tmp["h_w"].append(h_w.x.array.copy())
+tmp["phi"].append(phi.x.array.copy())
+tmp["T_i"].append(T_i_old.x.array.copy())
+tmp["T_w"].append(T_w_old.x.array.copy())
+tmp["k_rel"].append(krel.x.array.copy())
 tmp["times"].append(t)
-# dump temporary data into pickle file
-filename = "./Masterarbeit/solutions/full_5min_upwind.pkl"
+filename = "./Masterarbeit/solutions/full_1day_upwind.pkl"
 with open(filename, "wb") as f:
     pickle.dump(tmp, f)

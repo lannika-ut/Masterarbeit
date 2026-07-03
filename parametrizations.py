@@ -229,7 +229,7 @@ class Parameter:
 
     def W_SSA_numerical(self, Se, phi):
         """Numerical evaluation of the wet specific surface area."""
-        part1 = ((Se )*np.array(phi.x.array) *
+        part1 = (Se*np.array(phi.x.array) *
                  np.log(np.array(phi.x.array)))
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
@@ -287,6 +287,31 @@ class Parameter:
             krel.x.array[cell] = self.calc_krel(max_hw, alpha, N)
             krel.x.scatter_forward()
         return krel
+
+    def calc_source_term(self, hw, phi, Ti, Tw):
+        """Calculate the source term of the mass conservation laws as a DG0 function.
+
+        Args:
+            hw (fem.Function): Pressure head.
+            phi (fem.Function): Porosity in a DG0 function.
+            Ti (fem.Function): Ice temperature.
+            Tw (fem.Function): Water temperature.
+
+        Returns:
+            fem.Function: R_m*W_SSA*(T_int - T_melt)
+        """
+        Q = phi.function_space
+        src = fem.Function(Q)
+        hw_dg0 = fem.Function(Q)
+        hw_dg0.interpolate(hw)
+        Ti_dg0 = fem.Function(Q)
+        Ti_dg0.interpolate(Ti)
+        Tw_dg0 = fem.Function(Q)
+        Tw_dg0.interpolate(Tw)
+        Wssa = self.W_SSA_numerical(self.S_e_numerical(hw_dg0), phi)
+        Tint = self.T_int_numerical(Ti_dg0, Tw_dg0)
+        src.x.array[:] = self.R_m.value*Wssa*(Tint-self.T_melt.value)
+        return src   
 
     def make_into_dict(self):
         """Store attributes into dictionnary."""
