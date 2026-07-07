@@ -88,4 +88,21 @@ Poster fertig gemacht. Versucht upwinding zu implementieren. Ich glaube, das mü
 upwinding zum Laufen gebracht. Das Problem war wieder mal nur die Anfangsbedingung, die in diesem Fall einfach zu trocken war. Wenn man sie für Neumann+Dirichlet auf -0.22 m setzt, funktioniert es aber gut und ich hab keine Oszillationen mehr.
 
 03.07.2026 10:00 - 12:00 Uhr
-phi zu dg0 geändert, außerdem source-term für mass balance auch dg0 gemacht, krel upwind implementiert für ganzes System. Es ist jetzt ultra schnell, aber es ändert sich auch nicht so mega viel und osziliieren tut es trotzdem, aber nicht mehr ganz so schlimm unphysikalisch wie davor.
+phi zu dg0 geändert, außerdem source-term für mass balance auch dg0 gemacht, krel upwind implementiert für ganzes System. Es ist jetzt ultra schnell, aber es ändert sich auch nicht so mega viel und oszillieren tut es trotzdem, aber nicht mehr ganz so schlimm unphysikalisch wie davor.
+
+06.07.2026 10:00 - 12:00 Uhr
+getestet mit Dreiecken, das funktioniert aber nicht. Report angepasst.
+
+07.07.2026 09:00 - Uhr
+Besprechung mit Anne: versuchen streamlines für die Richards Gleichung zu plotten (plt.streamplot?), für non-isothermal: Wasser & Eis Temperaturen kappen auf T_melt+-eps, animation plotten vllt im Minutentakt für so ne Stunde, Anfangsbedingung für Wasser ändern: unterste 25 cm gesättigt, danach hydrostatisch, im Code Paper zitieren, z.B. von wo kommt theta_s = 0.9*phi?
+Im Report finite Elemente auch unter Theory schreiben (Theory = das was es schon gibt) und unter Methods (= Eigenleistung) die numerische Implementierung beschreiben. Dann Results und Discussion in einem Kapitel immer direkt untereinander zu jedem Test Case, danach noch Conclusion. Es gibt keine Vorgabe zur Seitenanzahl.
+sat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] <= water_level + 1e-14)
+unsat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] > water_level - 1e-14)
+h_w_old.interpolate(lambda x: x[1], cells0=sat_cells) # first 25 cm are saturated
+h_w_old.interpolate(
+    lambda x: np.clip(-(x[1] - water_level), -0.22, None), cells0=unsat_cells) # above hydrostatic
+Das funktioniert leider nicht, also auch nicht wenn man es strikt so macht, wie die Anne es vorgeschlagen hat...
+streamlines geplottet, kleine Animation gemacht, da würde ich aber gerne noch eine schicke Funktion draus machen. außerdem hab ich die Temperaturen gekappt.
+Nach der Animation scheint als erstes die Eistemperatur zu oszillieren, dann h_w, dann T_w und dann erst die Porosität...

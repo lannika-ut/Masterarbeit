@@ -145,19 +145,62 @@ def plotScalarFunction(V, u, warped=False, name = "u", title="", fct_as_array=Fa
 
 def eval_fct_on_grid(grid, u, domain):
     """
-    Evaluate a dolfinx.function u on a grid.
+    Evaluate a scalar or vector-valued dolfinx function on a grid.
 
     Args:
-        grid (np.ndarray, shape (x,2)): grid containing values in x-direction in grid[:,0] and values in z-direction in grid[:,1]
-        u (dolfinx.fem.function.Function): scalar function
-        domain (dolfinx.mesh.Mesh): mesh containing the topology
+        grid (np.ndarray): List of 2D points of the grid, size (nx*nz, 2).
+        u (dolfinx.fem.Function): Scalar or vector-valued function to be evaluated.
+        domain (dolfinx.mesh): Domain on which the function is defined.
+
+    Raises:
+        RuntimeError: If the points are not on the processor.
+
     Returns:
-        np.array (length of grid[:,0]): function values of u on the grid.
+        np.ndarray: Evaluated function. If u was scalar, the size is (nx*nz,), if u was vector-valued of dimension k, the size is (nx*nz, k).
     """
-    p = np.vstack([grid[:,0], grid[:,1], np.zeros(len(grid[:,0]))])
-    values = evaluate_fct(domain, p, u)
-    h = np.array(values).flatten()
-    return h
+
+    points = np.column_stack(
+        (grid[:, 0], grid[:, 1], np.zeros(len(grid)))
+    ).astype(np.float64)
+
+    bb_tree = geometry.bb_tree(domain, domain.topology.dim)
+    cell_candidates = geometry.compute_collisions_points(bb_tree, points)
+    colliding_cells = geometry.compute_colliding_cells(
+        domain, cell_candidates, points
+    )
+
+    cells = []
+    points_on_proc = []
+    point_ids = []
+
+    for i in range(len(points)):
+        links = colliding_cells.links(i)
+        if len(links) > 0:
+            cells.append(links[0])
+            points_on_proc.append(points[i])
+            point_ids.append(i)
+
+    if len(points_on_proc) == 0:
+        raise RuntimeError("No points found on this MPI rank.")
+
+    evaluated = u.eval(
+        np.asarray(points_on_proc, dtype=np.float64),
+        np.asarray(cells, dtype=np.int32),
+    )
+    
+    evaluated = np.asarray(evaluated)
+
+    # Scalar field
+    if evaluated.ndim == 1 or evaluated.shape[1] == 1:
+        values = np.full(len(points), np.nan)
+        values[point_ids] = evaluated.ravel()
+
+    # Vector/tensor field
+    else:
+        values = np.full((len(points), evaluated.shape[1]), np.nan)
+        values[point_ids] = evaluated
+
+    return values
 
 def get_grid(P0, P1, P2, P3, nx, nz):
     """
@@ -196,3 +239,6 @@ def get_grid(P0, P1, P2, P3, nx, nz):
     z_plot = (1 - x_int) * (1 - z_int) * P0[1] + x_int * (1 - z_int) * P1[1] + x_int * z_int * P2[1] + (1 - x_int) * z_int * P3[1]
 
     return grid, x_grid, z_grid
+
+def create_animation():
+    pass

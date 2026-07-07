@@ -15,6 +15,7 @@ from dolfinx.fem.petsc import (
     apply_lifting, set_bc,
     LinearProblem,
 )
+from dolfinx import mesh
 from ufl import (
     grad, dx, dot,
     SpatialCoordinate, TestFunction, TrialFunction,
@@ -104,6 +105,7 @@ print(
 
 geom = Geometry(height, length, slope=0)
 domain = geom.make_domain(nx, nz)
+tdim = domain.topology.dim
 V_hw = functionspace(domain, ("CG", 1))
 v_hw = TestFunction(V_hw)
 V_Ti = functionspace(domain, ("CG", 1))
@@ -139,13 +141,20 @@ print(bcs)
 
 # Set up time iteration
 delta_t = Constant(domain, PETSc.ScalarType(0.5))
-T_end = 24*60*60
+T_end = 5*60*60
 t = 0.0
 
 # Initial conditions
 h_w_old = Function(V_hw)
 h_w_old.name = "h_w_old"
-h_w_old.x.array[:] = -0.22*np.ones_like(h_w_old.x.array)
+water_level = 0.25
+sat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] <= water_level + 1e-14)
+unsat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] > water_level - 1e-14)
+h_w_old.interpolate(lambda x: x[1], cells0=sat_cells) # first 25 cm are saturated
+h_w_old.interpolate(
+    lambda x: np.clip(-(x[1] - water_level), -0.22, None), cells0=unsat_cells) # above hydrostatic
 
 phi_old = Function(Q)
 phi_old.name = "phi_old"
@@ -258,7 +267,9 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
 tmp["k_rel"].append(krel.x.array.copy())
-next_saving_time = 30*60
+next_saving_time = 30
+
+eps = 1e-1 # °C that ice (water) temp is allowed over (under) the melting point
 
 # Time loop
 while t <= T_end:
@@ -296,11 +307,13 @@ while t <= T_end:
         a_Ti, L_Ti, bcs=[bcs["top_Ti"], bcs["bottom_Ti"]], 
         petsc_options=petsc_options, petsc_options_prefix="T_i")
     T_i_h = problem_Ti.solve()
+    T_i_h.x.array[:] = np.clip(T_i_h.x.array, None, p.T_melt.value + eps)
     T_i_old.x.array[:] = T_i_h.x.array
     problem_Tw = LinearProblem(
         a_Tw, L_Tw, bcs=[bcs["top_Tw"]],
         petsc_options=petsc_options, petsc_options_prefix="T_w")
     T_w_h = problem_Tw.solve()
+    T_w_h.x.array[:] = np.clip(T_w_h.x.array, p.T_melt.value - eps, None)
     T_w_old.x.array[:] = T_w_h.x.array
 
     # Update source term with new values
@@ -320,7 +333,7 @@ while t <= T_end:
 
     # save temporary data
     if True and t >= next_saving_time:
-        next_saving_time += 30*60
+        next_saving_time += 30
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["phi"].append(phi.x.array.copy())
         tmp["T_i"].append(T_i_old.x.array.copy())
@@ -350,6 +363,6 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["k_rel"].append(krel.x.array.copy())
 tmp["times"].append(t)
-filename = "./Masterarbeit/solutions/full_1day_upwind.pkl"
+filename = "./Masterarbeit/solutions/full_5h_sathydrostatic.pkl"
 with open(filename, "wb") as f:
     pickle.dump(tmp, f)
