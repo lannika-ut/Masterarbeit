@@ -25,7 +25,8 @@ from petsc4py import PETSc
 import pickle
 
 
-def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
+def solve_Richards(
+        h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename):
     min_dt = 1e-2
     new_dt = delta_t.value
     repeat_time_step = False
@@ -53,6 +54,11 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t):
     num_iter = snes.getIterationNumber()
     if converged <= 0:
         if float(delta_t.value) <= min_dt:
+            # Save data so far:
+            tmp["h_w"].append(h_w_old.x.array.copy())
+            foldername = "./Masterarbeit/solutions/debug/"
+            with open(foldername + filename + ".pkl", "wb") as f:
+                pickle.dump(tmp, f)
             raise RuntimeError(
                 f"Solver failed to converge (reason {converged}) even at "
                 f"the minimum time step {min_dt} s, t={t/3600:.2f} h."
@@ -118,43 +124,15 @@ x = SpatialCoordinate(domain)
 # Get parameters
 p = Parameter(domain)
 
-# Set up boundary conditions
-boundaries = {
-    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 1)),
-    2: lambda x: np.isclose(x[1], 2),
-    3: lambda x: np.isclose(x[1], 0)}
-bc_dict = {
-    "top_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": 0,
-        "functionspace": V_Ti, "testfunction": v_Ti},
-    "top_Tw": {
-        "marker": 2, "name": "Dirichlet", "value": 0,
-        "functionspace": V_Tw, "testfunction": v_Tw},
-    "bottom_Ti": {
-        "marker": 3, "name": "Dirichlet", "value": -1,
-        "functionspace": V_Ti, "testfunction": v_Ti}
-}
-
-bc = BoundaryCondition(domain, boundaries)
-bcs, dontuse = bc.make_boundary_condition(bc_dict)
-print(bcs)
-
 # Set up time iteration
 delta_t = Constant(domain, PETSc.ScalarType(0.5))
-T_end = 5*60*60
+T_end = 60*60
 t = 0.0
 
 # Initial conditions
 h_w_old = Function(V_hw)
 h_w_old.name = "h_w_old"
-water_level = 0.25
-sat_cells = mesh.locate_entities(
-    domain, tdim, lambda x: x[1] <= water_level + 1e-14)
-unsat_cells = mesh.locate_entities(
-    domain, tdim, lambda x: x[1] > water_level - 1e-14)
-h_w_old.interpolate(lambda x: x[1], cells0=sat_cells) # first 25 cm are saturated
-h_w_old.interpolate(
-    lambda x: np.clip(-(x[1] - water_level), -0.22, None), cells0=unsat_cells) # above hydrostatic
+h_w_old.x.array[:] = -0.22
 
 phi_old = Function(Q)
 phi_old.name = "phi_old"
@@ -164,7 +142,7 @@ T_i_old = Function(V_Ti)
 T_i_old.name = "T_i_old"
 def temp_gradient(x):
     return x[1]/2-1
-T_i_old.interpolate(temp_gradient)
+T_i_old.x.array[:] = -1
 
 T_w_old = Function(V_Tw)
 T_w_old.name = "T_w_old"
@@ -222,14 +200,38 @@ F_Tw = (
     (p.T_int(T_i_old, T_w_old) - T_w)/p.r_w * dx
 )
 
+# Set up boundary conditions
+boundaries = {
+    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 1)),
+    2: lambda x: np.isclose(x[1], 2),
+    3: lambda x: np.isclose(x[1], 0)}
+bc_dict = {
+    "top_Ti": {
+        "marker": 2, "name": "Dirichlet", "value": 0,
+        "functionspace": V_Ti, "testfunction": v_Ti},
+    "top_Tw": {
+        "marker": 2, "name": "Dirichlet", "value": 0,
+        "functionspace": V_Tw, "testfunction": v_Tw},
+    "top_hw": {
+        "marker": 2, "name": "Dirichlet", "value": 1, 
+        "functionspace": V_hw, "testfunction": v_hw},
+    "bottom_Ti": {
+        "marker": 3, "name": "Dirichlet", "value": -1,
+        "functionspace": V_Ti, "testfunction": v_Ti}
+}
+
+bc = BoundaryCondition(domain, boundaries)
+bcs = bc.make_boundary_condition(bc_dict)
+print(bcs)
+
 # Create Newton solver
 snes1 = PETSc.SNES().create()
 snes2 = PETSc.SNES().create()
 # Set up nonlinear problem
-problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=None)
+problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=bcs["top_hw"])
 b_hw1 = create_vector(V_hw)
 J_hw1 = create_matrix(problem_hw1.a)
-problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=None)
+problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=bcs["top_hw"])
 b_hw2 = create_vector(V_hw)
 J_hw2 = create_matrix(problem_hw2.a)
 
@@ -267,9 +269,10 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
 tmp["k_rel"].append(krel.x.array.copy())
-next_saving_time = 30
+next_saving_time = 10
 
 eps = 1e-1 # °C that ice (water) temp is allowed over (under) the melting point
+filename = "1h_Camilla_1TotalRefreezing"
 
 # Time loop
 while t <= T_end:
@@ -293,7 +296,7 @@ while t <= T_end:
 
     # Solve Richards
     h_w1, repeat_time_step, new_dt = solve_Richards(
-        h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t)
+        h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename)
     if repeat_time_step:
         delta_t.value = new_dt
         continue
@@ -329,11 +332,11 @@ while t <= T_end:
 
     # Solve Richards again
     h_w, repeat_time_step, dontusethistimestep = solve_Richards(
-        h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t)
+        h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename)
 
     # save temporary data
     if True and t >= next_saving_time:
-        next_saving_time += 30
+        next_saving_time += 10
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["phi"].append(phi.x.array.copy())
         tmp["T_i"].append(T_i_old.x.array.copy())
@@ -363,6 +366,6 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["k_rel"].append(krel.x.array.copy())
 tmp["times"].append(t)
-filename = "./Masterarbeit/solutions/full_5h_sathydrostatic.pkl"
-with open(filename, "wb") as f:
+filename = "1h_Camilla_1TotalRefreezing"
+with open("./Masterarbeit/solutions/" + filename + ".pkl", "wb") as f:
     pickle.dump(tmp, f)

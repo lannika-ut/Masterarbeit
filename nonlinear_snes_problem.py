@@ -40,9 +40,9 @@ class NonlinearPDE_SNESProblem:
             f_local.set(0.0)
         assemble_vector(F, self.L)
         if self.bc is not None:
-            apply_lifting(F, [self.a], bcs=[[self.bc]], x0=[x], alpha=-1.0)
+            apply_lifting(F, [self.a], bcs=[self.bc], x0=[x], alpha=-1.0)
             F.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-            set_bc(F, [self.bc], x, -1.0)
+            set_bc(F, self.bc, x, -1.0)
 
     def J(self, snes, x, J, P):
         """Assemble Jacobian matrix."""
@@ -54,7 +54,7 @@ class NonlinearPDE_SNESProblem:
                                        mode=PETSc.ScatterMode.FORWARD)
         J.zeroEntries()
         if self.bc is not None:
-            assemble_matrix(J, self.a, bcs=[self.bc])
+            assemble_matrix(J, self.a, bcs=self.bc)
         else:
             assemble_matrix(J, self.a)
         J.assemble()

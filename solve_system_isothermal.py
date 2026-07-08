@@ -110,7 +110,9 @@ def solve_system(
         if d["variable"] == "h_w":
             d["functionspace"] = V_hw
             d["testfunction"] = v_hw
-    bcs, F_hw = bc.make_boundary_condition(bc_dict, F_hw)
+            d["problem"] = F_hw
+    bcs = bc.make_boundary_condition(bc_dict)
+    F_hw += bcs["top"]
 
     # Create Newton solver
     snes = PETSc.SNES().create()
@@ -196,7 +198,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_all_Neumann.pkl"
+filename = "./Masterarbeit/solutions/isothermal_test_newbc.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

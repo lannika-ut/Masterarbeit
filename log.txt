@@ -93,7 +93,7 @@ phi zu dg0 geändert, außerdem source-term für mass balance auch dg0 gemacht, 
 06.07.2026 10:00 - 12:00 Uhr
 getestet mit Dreiecken, das funktioniert aber nicht. Report angepasst.
 
-07.07.2026 09:00 - Uhr
+07.07.2026 09:00 - 15:30 Uhr
 Besprechung mit Anne: versuchen streamlines für die Richards Gleichung zu plotten (plt.streamplot?), für non-isothermal: Wasser & Eis Temperaturen kappen auf T_melt+-eps, animation plotten vllt im Minutentakt für so ne Stunde, Anfangsbedingung für Wasser ändern: unterste 25 cm gesättigt, danach hydrostatisch, im Code Paper zitieren, z.B. von wo kommt theta_s = 0.9*phi?
 Im Report finite Elemente auch unter Theory schreiben (Theory = das was es schon gibt) und unter Methods (= Eigenleistung) die numerische Implementierung beschreiben. Dann Results und Discussion in einem Kapitel immer direkt untereinander zu jedem Test Case, danach noch Conclusion. Es gibt keine Vorgabe zur Seitenanzahl.
 sat_cells = mesh.locate_entities(
@@ -106,3 +106,15 @@ h_w_old.interpolate(
 Das funktioniert leider nicht, also auch nicht wenn man es strikt so macht, wie die Anne es vorgeschlagen hat...
 streamlines geplottet, kleine Animation gemacht, da würde ich aber gerne noch eine schicke Funktion draus machen. außerdem hab ich die Temperaturen gekappt.
 Nach der Animation scheint als erstes die Eistemperatur zu oszillieren, dann h_w, dann T_w und dann erst die Porosität...
+
+08.07.2026 13:00 - Uhr
+gemerkt, dass ich nicht die richtige Anfangsbedingung hatte (gesättigt war nicht richtig rum), aber das hat auch keinen Unterschied gemacht. Jetzt will ich nochmal Camillas ersten Test Case testen.
+sat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] <= water_level + 1e-14)
+unsat_cells = mesh.locate_entities(
+    domain, tdim, lambda x: x[1] > water_level - 1e-14)
+h_w_old.interpolate(lambda x: (water_level - x[1]), cells0=sat_cells) # first 25 cm are saturated
+h_w_old.interpolate(
+    lambda x: np.clip(-(x[1] - water_level), None, None), cells0=unsat_cells) # above hydrostatic
+Es funktioniert wirklich nicht gut, wenn man das so macht. Ich hab Camillas Test Case 1 getestet, das funktioniert gar nicht, aber wenn man statt -5°C nur -1°C nimmt und den Schnee wirklich sehr nass startet bei hw = -0.1 m dann läuft es durch und erreicht ca nach ner Stunde glaub steady state, weil es dann durchnässt ist. Aber vor allem die Temperaturen oszillieren halt stark.
+Jetzt hab ich angefangen, das Lösungsverfahren in eine Funktion zu schreiben. Dafür hab ich nochmal die boundary_condition Klasse angepasst. 

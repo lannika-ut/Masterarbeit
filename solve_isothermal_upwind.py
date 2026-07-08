@@ -118,18 +118,19 @@ def solve_system(
                 p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
         + dot(grad(v_hw), (p.K_s(phi)*krel*grad(x[1]+h_w))) * dx
     )
-    # Boundary conditions
     bc = BoundaryCondition(domain, boundaries)
     for d in bc_dict.values():
         if d["variable"] == "h_w":
             d["functionspace"] = V_hw
             d["testfunction"] = v_hw
-    bcs, F_hw = bc.make_boundary_condition(bc_dict, F_hw)
+            d["problem"] = F_hw
+    bcs = bc.make_boundary_condition(bc_dict)
+    F_hw += bcs["top"]
 
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=None)
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=[])
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -215,7 +216,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_upwind_Neumann.pkl"
+filename = "./Masterarbeit/solutions/isothermal_test_newbc.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

@@ -54,18 +54,16 @@ class BoundaryCondition:
                     "name": type_of_bc("Dirichlet" or "Neumann"),
                     "value": boundary_value_or_function,
                     "functionspace": fem.functionspace,
-                    "testfunction": ufl.TestFunction
+                    "testfunction": ufl.TestFunction,
                     },
                     ...
                 }.
-            F (ufl problem): symbolic weak form of the problem. Defaults to None.
 
         Raises:
             TypeError: Boundary condition unknown (name neither Dirichlet nor Neumann).
 
         Returns:
-            dict: Dictionnary containing either the fem.dirichletbc or the integral over the Neumann boundary of the function*testfunction. {key: dirichlet_or_Neumann_bc}. The key is the same as in bc_dict.
-            ufl problem: weak formulation of the problem with the Neumann boundary condition added.
+            dict: Dictionnary containing either the fem.dirichletbc or the integral over the Neumann boundary of the function*testfunction. {key: dirichlet_or_Neumann}. The key is the same as in bc_dict.
         """
         bcs = {}
         for key, values in bc_dict.items():
@@ -83,9 +81,8 @@ class BoundaryCondition:
                     bc = fem.dirichletbc(u_D, dofsD, V)                
             elif values["name"] == "Neumann":
                 bc = values["testfunction"]*values["value"]*self.ds(marker)
-                F += bc
             else:
                 raise ValueError(
                     f"Unknown boundary condition, maybe you misspelled. Accepted are 'Dirichlet' and 'Neumann'. Got: {values['name']}")
             bcs[key] = bc
-        return bcs, F
+        return bcs
