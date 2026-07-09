@@ -48,6 +48,7 @@ class Parameter:
         self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))  # m^2/s
 
         self.layer_params_dict = layer_params
+        self.S_r = fem.Constant(domain, PETSc.ScalarType(1e-3)) # residual saturation
         # snow/van Genuchten parameters
         if layer_params is not None:
             self.is_layered = True
@@ -58,23 +59,25 @@ class Parameter:
             self.r_w = param_fct["r_w"]
             self.alpha = param_fct["alpha"]
             self.N = param_fct["N"]
+            self.min_hw = param_fct["min_hw"]
             self.layer_params_dict = layer_params
         else:  # homogeneous snow
             self.is_layered = False
-            self.d_i = fem.Constant(domain, PETSc.ScalarType(3e-4))  # m
+            self.d_i = fem.Constant(domain, PETSc.ScalarType(1.5e-3))  # m
             self.r_i = fem.Constant(domain,
                                     PETSc.ScalarType(0.06*self.d_i.value))  # m
             self.r_w = fem.Constant(domain,
                                     PETSc.ScalarType(1.35*self.d_i.value))  # m
-            self.rho_s = fem.Constant(domain, PETSc.ScalarType(350))  # kg/m^3
+            self.rho_s = fem.Constant(domain, PETSc.ScalarType(501))  # kg/m^3
             a = (4.4e6) * (self.rho_s.value/self.d_i.value)**(-0.98)  # 1/m
             n = 1 + (2.7e-3) * (self.rho_s.value/self.d_i.value)**(0.61)
             self.alpha = fem.Constant(domain, PETSc.ScalarType(a))
             self.N = fem.Constant(domain, PETSc.ScalarType(n))
+            self.min_hw = fem.Constant(
+                domain, PETSc.ScalarType(self.calc_min_hw()))
 
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
-        self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
-        self.S_r = fem.Constant(domain, PETSc.ScalarType(1e-3))  # residual saturation
+        self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(3514))  # 1/m
 
     def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
@@ -93,6 +96,7 @@ class Parameter:
         N = fem.Function(Q)
         r_i = fem.Function(Q)
         r_w = fem.Function(Q)
+        minhw = fem.Function(Q)
 
         tdim = domain.topology.dim
         num_cells = domain.topology.index_map(tdim).size_local
@@ -105,6 +109,7 @@ class Parameter:
         n_vals = np.zeros(num_cells)
         ri_vals = np.zeros(num_cells)
         rw_vals = np.zeros(num_cells)
+        minhw_vals = np.zeros(num_cells)
 
         for c, x in enumerate(midpoints):
             # Check in which layer the midpoint is and assign the corresponding parameters
@@ -118,6 +123,8 @@ class Parameter:
                         (value["rho_s"]/value["d_i"])**(0.61))
                     ri_vals[c] = 0.06*value["d_i"]
                     rw_vals[c] = 1.35*value["d_i"]
+                    minhw_vals[c] = (-(self.S_r.value**(n_vals[c]/(1-n_vals[c]))
+                                       - 1)**(1/n_vals[c])/alpha_vals[c])
 
         # Fill functions with right values
         alpha.x.array[:] = alpha_vals
@@ -126,6 +133,7 @@ class Parameter:
         rho_s.x.array[:] = rho_s_vals
         r_i.x.array[:] = ri_vals
         r_w.x.array[:] = rw_vals
+        minhw.x.array[:] = minhw_vals
 
         alpha.x.scatter_forward()
         N.x.scatter_forward()
@@ -133,22 +141,35 @@ class Parameter:
         rho_s.x.scatter_forward()
         r_i.x.scatter_forward()
         r_w.x.scatter_forward()
+        minhw.x.scatter_forward()
         # arange into dict
         _dict = {"d_i": d_i,
                  "rho_s": rho_s,
                  "alpha": alpha,
                  "N": N,
                  "r_i": r_i,
-                 "r_w": r_w
+                 "r_w": r_w,
+                 "min_hw": minhw,
                  }
         return _dict
 
+    def calc_min_hw(self):
+        """Calculate min. pressure head such that saturation stays above 0.001."""
+        minhw = (
+            -(self.S_r.value**(self.N.value/(1-self.N.value))
+              - 1)**(1/self.N.value)/self.alpha.value)
+        return minhw
+
     def S_e(self, h_w):
         """Calculate the effective saturation after van Genuchten."""
-        h_w_neg = ufl.min_value(h_w, -1e-8)
+        if self.is_layered:
+            h_w_safe = ufl.max_value(h_w, self.min_hw)
+        else:
+            h_w_safe = ufl.max_value(h_w, self.min_hw)
+        h_w_safe = ufl.min_value(h_w_safe, -1e-8)
         return ufl.conditional(
-            h_w < 0,
-            (1 + (-self.alpha*h_w_neg)**self.N) ** ((1-self.N)/self.N),
+            h_w < -1e-8,
+            (1 + (-self.alpha*h_w_safe)**self.N) ** ((1-self.N)/self.N),
             1)
 
     def theta(self, Se, phi):
@@ -184,7 +205,7 @@ class Parameter:
 
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area. """
-        part1 = (Se) * ufl.ln(phi) * phi
+        part1 = (Se - self.S_r) * ufl.ln(phi) * phi
         phi0 = 1 - self.rho_s/self.rho_i
         return part1*self.SSA_0 / (phi0*ufl.ln(phi0))
 
@@ -195,12 +216,15 @@ class Parameter:
         if self.is_layered:
             a = np.array(self.alpha.x.array)
             n = np.array(self.N.x.array)
-            Se[hw < 0] = ((1 + (-a[hw < 0]*hw[hw < 0])**n[hw < 0])
-                          ** ((1-n[hw < 0])/n[hw < 0]))
+            hw_safe = np.clip(hw, self.min_hw.x.array, -1e-8)
+            Se[hw < -1e-8] = ((1 + (-a[hw < -1e-8]*hw_safe[hw < -1e-8])
+                               ** n[hw < -1e-8])
+                               ** ((1-n[hw < -1e-8])/n[hw < -1e-8]))
         else:
             a = self.alpha.value
             n = self.N.value
-            Se[hw < 0] = (1 + (-a*hw[hw < 0])**n) ** ((1-n)/n)
+            hw_safe = np.clip(hw, self.min_hw.value, -1e-8)
+            Se[hw < -1e-8] = (1 + (-a*hw_safe[hw < -1e-8])**n) ** ((1-n)/n)
         return Se
 
     def theta_numerical(self, Se, phi):
@@ -229,15 +253,15 @@ class Parameter:
 
     def W_SSA_numerical(self, Se, phi):
         """Numerical evaluation of the wet specific surface area."""
-        part1 = (Se*np.array(phi.x.array) *
+        part1 = ((Se-self.S_r.value)*np.array(phi.x.array) *
                  np.log(np.array(phi.x.array)))
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         return part1*self.SSA_0.value / (phi0*np.log(phi0))
-    
-    def calc_krel(self, hw, alpha, N):
+
+    def calc_krel(self, hw, alpha, N, minhw):
         """Calculate the relative permeability for a given pressure head.
 
         Args:
@@ -247,15 +271,16 @@ class Parameter:
         Returns:
             float: value of the relative permeability.
         """
-        m  = 1 - 1/N
+        m = 1 - 1/N
         Se = 1
         krel = 1
-        if hw < 0:
+        if hw < -1e-8:
+            hw = np.clip(hw, minhw, None)
             Se = (1 + (-alpha*hw)**N) ** ((1-N)/N)
             if Se < 1-1e-7:
                 krel = np.sqrt(Se) * (1 - (1-Se**(1/m))**m)**2
         return krel
-    
+
     def upwind_krel(self, hw, domain):
         """Calculate the relative permeability in an upwind scheme, i.e. for each cell, take the h_w value of the cell's node where h_tot is the highest for calculating k_rel.
 
@@ -270,21 +295,23 @@ class Parameter:
         krel = fem.Function(Q)
         # Find out which nodes belong to which element
         tdim = domain.topology.dim
-        c2v = domain.topology.connectivity(tdim, 0) # element -> nodes
+        c2v = domain.topology.connectivity(tdim, 0)  # element -> nodes
         num_cells = domain.topology.index_map(tdim).size_local
         cells = np.arange(num_cells, dtype=np.int32)
         for cell in cells:
             node_index = c2v.links(cell)
             node_coords = domain.geometry.x[node_index]
-            h_tot = hw.x.array[node_index] + node_coords[:, 1] # h_tot = hw + z
+            h_tot = hw.x.array[node_index] + node_coords[:, 1]  # h_tot = hw + z
             max_hw = hw.x.array[node_index[np.argmax(h_tot)]]
             if self.is_layered:
                 alpha = self.alpha.x.array[cell]
                 N = self.N.x.array[cell]
+                minhw = self.min_hw.x.array[cell]
             else:
                 alpha = self.alpha.value
                 N = self.N.value
-            krel.x.array[cell] = self.calc_krel(max_hw, alpha, N)
+                minhw = self.min_hw.value
+            krel.x.array[cell] = self.calc_krel(max_hw, alpha, N, minhw)
             krel.x.scatter_forward()
         return krel
 
@@ -311,12 +338,12 @@ class Parameter:
         Wssa = self.W_SSA_numerical(self.S_e_numerical(hw_dg0), phi)
         Tint = self.T_int_numerical(Ti_dg0, Tw_dg0)
         src.x.array[:] = self.R_m.value*Wssa*(Tint-self.T_melt.value)
-        return src   
+        return src
 
     def make_into_dict(self):
         """Store attributes into dictionnary."""
         d = {}
-        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N"]
+        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N", "min_hw"]
         for key, value in vars(self).items():
             if self.is_layered and key in p_layers:
                 d[key] = value.x.array

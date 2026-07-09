@@ -103,9 +103,9 @@ def validate_state(h_w, phi, T_i, T_w, label="State"):
 # Set up geometry
 height = 2
 length = 1
-delta_x = delta_z = 0.1
-nx = int(6/delta_x)
-nz = int(3/delta_x)
+delta_x = delta_z = 0.05
+nx = int(length/delta_x)
+nz = int(height/delta_x)
 print(
     f"Resolution is dx = {delta_x} m, dz = {delta_z} m, giving nx = {nx}, nz = {nz}")
 
@@ -126,7 +126,7 @@ p = Parameter(domain)
 
 # Set up time iteration
 delta_t = Constant(domain, PETSc.ScalarType(0.5))
-T_end = 60*60
+T_end = 5*60*60
 t = 0.0
 
 # Initial conditions
@@ -212,9 +212,6 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0,
         "functionspace": V_Tw, "testfunction": v_Tw},
-    "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 1, 
-        "functionspace": V_hw, "testfunction": v_hw},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -1,
         "functionspace": V_Ti, "testfunction": v_Ti}
@@ -228,10 +225,10 @@ print(bcs)
 snes1 = PETSc.SNES().create()
 snes2 = PETSc.SNES().create()
 # Set up nonlinear problem
-problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=bcs["top_hw"])
+problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=[])
 b_hw1 = create_vector(V_hw)
 J_hw1 = create_matrix(problem_hw1.a)
-problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=bcs["top_hw"])
+problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=[])
 b_hw2 = create_vector(V_hw)
 J_hw2 = create_matrix(problem_hw2.a)
 
@@ -269,10 +266,10 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["times"].append(t)
 tmp["k_rel"].append(krel.x.array.copy())
-next_saving_time = 10
+next_saving_time = 30
 
 eps = 1e-1 # °C that ice (water) temp is allowed over (under) the melting point
-filename = "1h_Camilla_1TotalRefreezing"
+filename = "test_fct_1"
 
 # Time loop
 while t <= T_end:
@@ -336,7 +333,7 @@ while t <= T_end:
 
     # save temporary data
     if True and t >= next_saving_time:
-        next_saving_time += 10
+        next_saving_time += 30
         tmp["h_w"].append(h_w.x.array.copy())
         tmp["phi"].append(phi.x.array.copy())
         tmp["T_i"].append(T_i_old.x.array.copy())
@@ -366,6 +363,6 @@ tmp["T_i"].append(T_i_old.x.array.copy())
 tmp["T_w"].append(T_w_old.x.array.copy())
 tmp["k_rel"].append(krel.x.array.copy())
 tmp["times"].append(t)
-filename = "1h_Camilla_1TotalRefreezing"
+
 with open("./Masterarbeit/solutions/" + filename + ".pkl", "wb") as f:
     pickle.dump(tmp, f)

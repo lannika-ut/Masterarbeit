@@ -107,7 +107,7 @@ Das funktioniert leider nicht, also auch nicht wenn man es strikt so macht, wie 
 streamlines geplottet, kleine Animation gemacht, da würde ich aber gerne noch eine schicke Funktion draus machen. außerdem hab ich die Temperaturen gekappt.
 Nach der Animation scheint als erstes die Eistemperatur zu oszillieren, dann h_w, dann T_w und dann erst die Porosität...
 
-08.07.2026 13:00 - Uhr
+08.07.2026 13:00 - 16:00 Uhr
 gemerkt, dass ich nicht die richtige Anfangsbedingung hatte (gesättigt war nicht richtig rum), aber das hat auch keinen Unterschied gemacht. Jetzt will ich nochmal Camillas ersten Test Case testen.
 sat_cells = mesh.locate_entities(
     domain, tdim, lambda x: x[1] <= water_level + 1e-14)
@@ -118,3 +118,8 @@ h_w_old.interpolate(
     lambda x: np.clip(-(x[1] - water_level), None, None), cells0=unsat_cells) # above hydrostatic
 Es funktioniert wirklich nicht gut, wenn man das so macht. Ich hab Camillas Test Case 1 getestet, das funktioniert gar nicht, aber wenn man statt -5°C nur -1°C nimmt und den Schnee wirklich sehr nass startet bei hw = -0.1 m dann läuft es durch und erreicht ca nach ner Stunde glaub steady state, weil es dann durchnässt ist. Aber vor allem die Temperaturen oszillieren halt stark.
 Jetzt hab ich angefangen, das Lösungsverfahren in eine Funktion zu schreiben. Dafür hab ich nochmal die boundary_condition Klasse angepasst. 
+
+09.07.2026 10:00 - 15:30 Uhr
+solve Funktion fertiggschrieben, muss aber noch kommentiert werden. Test Case Moure ausprobiert (letzter Test Case im Paper, mit no-flow unten). Das hat dann nicht gepasst, weil es zu doll gefroren ist und dann Se explodiert ist. Dann hab ich die Parameter angepasst, dass es eine residual saturation von 10^(-3) gibt und W_SSA regularisiert mit Term S_e-S_r statt nur S_e. jetzt würde es wahrscheinlich auch noch Sinn machen, dann auch hw zu kappen???
+Ich weiß auch gar nicht, ob ich das jetzt wirklich richtig mache, das muss ich vielleicht nochmal überlegen...
+Na ja, also auf jeden Fall oszillieren die Temperaturen immer noch, das find ich sehr schade, also da sollte ich wirklich als nächstes mich ran setzen, weil die Temperaturen Plots sehen sehr, sehr schnell immer gleich aus.

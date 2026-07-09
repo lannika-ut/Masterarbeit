@@ -216,7 +216,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_test_newbc.pkl"
+filename = "./Masterarbeit/solutions/isothermal_test_newparams.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

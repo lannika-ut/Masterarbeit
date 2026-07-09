@@ -40,7 +40,7 @@ def solve_Richards(
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
-    ksp.setErrorIfNotConverged(True)
+    ksp.setErrorIfNotConverged(False)
     ksp.getPC().setType(PETSc.PC.Type.HYPRE)
     ksp.getPC().setHYPREType("boomeramg")
 
@@ -70,20 +70,16 @@ def solve_Richards(
     
     sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
     h_w.x.scatter_forward()
-
     # Converged, but check if it was "slow" and should shrink dt anyway
     if num_iter > 10 and float(delta_t.value) > min_dt:
         new_dt = max(0.5*float(delta_t.value), min_dt)
         repeat_time_step = True
         return h_w, repeat_time_step, new_dt
-
     if num_iter < 3 and float(delta_t.value) < 7:
         new_dt = min(float(delta_t.value)*1.2, 7)
-
     print(
         f"Solver converged after {num_iter} iterations, reason {converged}. "
-        f"dt = {delta_t.value:.2f} s at t={t/3600:.2f} h."
-    )
+        f"dt = {delta_t.value:.2f} s at t={t/3600:.2f} h.")
     return h_w, repeat_time_step, new_dt
 
 def validate_state(h_w, phi, T_i, T_w, label="State"):
@@ -105,7 +101,7 @@ def apply_initial_condition(f, ini):
     return f
 
 def solve_system(
-        filename, geom, delta_x, boundaries, bc_dict, initial_conditions, layer_params=None, delta_t = 0.5, T_end=24*60*60):
+        filename, geom, delta_x, boundaries, bc_dict, initial_conditions, layer_params=None, delta_t = 0.5, T_end=24*60*60, saving_interval=60):
     # Set up domain, fem structure
     nx = int(geom.length/delta_x)
     nz = int(geom.height/delta_x)
@@ -123,6 +119,10 @@ def solve_system(
 
     # Parameters
     p = Parameter(domain, layer_params)
+    eps = 0.1 # °C that water (ice) can go lower (higher) than freezing temp
+    # Time parameters
+    delta_t = Constant(domain, PETSc.ScalarType(delta_t))
+    t = 0
 
     # Set up functions, initial conditions
     h_w_old = Function(V_hw)
@@ -202,7 +202,6 @@ def solve_system(
         elif d["variable"] == "T_w":
             d["functionspace"] = V_Tw
             d["testfunction"] = v_Tw
-
     bcs = bc.make_boundary_condition(bc_dict)
     bc_D_hw = []
     bc_D_Ti = []
@@ -225,6 +224,165 @@ def solve_system(
                 bc_D_Ti.append(bcs[key])
             elif d["variable"] == "T_w":
                 bc_D_Tw.append(bcs[key])
+    print(bc_D_hw, bc_D_Ti, bc_D_Tw)
     
+    # Create solver structure
+    snes1 = PETSc.SNES().create()
+    snes2 = PETSc.SNES().create()
+    # Set up nonlinear problem
+    problem_hw1 = NonlinearPDE_SNESProblem(F_hw1, h_w, bc=bc_D_hw)
+    b_hw1 = create_vector(V_hw)
+    J_hw1 = create_matrix(problem_hw1.a)
+    problem_hw2 = NonlinearPDE_SNESProblem(F_hw2, h_w, bc=bc_D_hw)
+    b_hw2 = create_vector(V_hw)
+    J_hw2 = create_matrix(problem_hw2.a)
+    # Set up linear solver options
+    petsc_options = {
+        "ksp_error_if_not_converged": True,
+        "ksp_type": "gmres",
+        "ksp_rtol": 1e-4,
+        "ksp_atol": 1e-6,
+        "pc_type": "hypre",
+        "pc_hypre_type": "boomeramg",
+        "pc_hypre_boomeramg_max_iter": 1,
+        "pc_hypre_boomeramg_cycle_type": "v",
+    }
+    # Set up linear problem
+    a_Ti, L_Ti = system(F_Ti)
+    a_Tw, L_Tw = system(F_Tw)
 
-    # und weiter gehts
+    # Create structure for saving intermediate results
+    tmp = {
+        "geometry": geom.make_into_dict(),
+        "T_end": T_end,
+        "parameter": p.make_into_dict(),
+        "h_w": [],
+        "phi": [],
+        "T_i": [],
+        "T_w": [],
+        "T_int": [],
+        "times": [],
+        "k_rel":[],
+        "saving_interval": saving_interval,
+    }
+    tmp["h_w"].append(h_w_old.x.array.copy())
+    tmp["phi"].append(phi_old.x.array.copy())
+    tmp["T_i"].append(T_i_old.x.array.copy())
+    tmp["T_w"].append(T_w_old.x.array.copy())
+    tmp["times"].append(t)
+    tmp["k_rel"].append(krel.x.array.copy())
+    next_saving_time = saving_interval
+
+    # Time loop
+    while t <= T_end:
+        # Upwind krel
+        new_krel = p.upwind_krel(h_w_old, domain)
+        krel.x.array[:] = new_krel.x.array
+        krel.x.scatter_forward()
+
+        # Calculate source term
+        new_source = p.calc_source_term(h_w_old, phi_old, T_i_old, T_w_old)
+        source_mass.x.array[:] = new_source.x.array
+        source_mass.x.scatter_forward()
+
+        # Update porosity
+        max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
+        source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
+        phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
+
+        # Solve Richards
+        h_w1, repeat_time_step, new_dt = solve_Richards(
+            h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename)
+        if repeat_time_step:
+            delta_t.value = new_dt
+            continue
+        
+        # Update krel with new pressure head
+        new_krel = p.upwind_krel(h_w1, domain)
+        krel.x.array[:] = new_krel.x.array
+        krel.x.scatter_forward()
+       
+        # Solve Thermodynamics
+        problem_Ti = LinearProblem(
+            a_Ti, L_Ti, bcs=bc_D_Ti, 
+            petsc_options=petsc_options, petsc_options_prefix="T_i")
+        T_i_h = problem_Ti.solve()
+        T_i_h.x.array[:] = np.clip(T_i_h.x.array, None, p.T_melt.value + eps)
+        T_i_old.x.array[:] = T_i_h.x.array
+        problem_Tw = LinearProblem(
+            a_Tw, L_Tw, bcs=bc_D_Tw, 
+            petsc_options=petsc_options, petsc_options_prefix="T_w")
+        T_w_h = problem_Tw.solve()
+        T_w_h.x.array[:] = np.clip(T_w_h.x.array, p.T_melt.value - eps, None)
+        T_w_old.x.array[:] = T_w_h.x.array
+
+        # Update source term with new values
+        new_source = p.calc_source_term(h_w1, phi1, T_i_h, T_w_h)
+        source_mass.x.array[:] = new_source.x.array
+        source_mass.x.scatter_forward()
+
+        # Update porosity again 
+        source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
+        phi.x.array[:] = np.clip(phi.x.array, 0, 1)
+
+        # Solve Richards again
+        h_w, repeat_time_step, dontusethistimestep = solve_Richards(
+            h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename)
+
+        # save temporary data
+        if t >= next_saving_time:
+            next_saving_time += saving_interval
+            tmp["h_w"].append(h_w.x.array.copy())
+            tmp["phi"].append(phi.x.array.copy())
+            tmp["T_i"].append(T_i_old.x.array.copy())
+            tmp["T_w"].append(T_w_old.x.array.copy())
+            tmp["k_rel"].append(krel.x.array.copy())
+            tmp["times"].append(t)
+
+        h_w_old.x.array[:] = h_w.x.array
+        phi_old.x.array[:] = phi.x.array
+        #validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
+        delta_t.value = new_dt
+        t += float(delta_t.value)
+
+    # Destroy PETSc objects
+    snes1.destroy()
+    snes2.destroy()
+    b_hw1.destroy()
+    J_hw1.destroy()
+    b_hw2.destroy()
+    J_hw2.destroy()
+
+    # save final data
+    tmp["h_w"].append(h_w.x.array.copy())
+    tmp["phi"].append(phi.x.array.copy())
+    tmp["T_i"].append(T_i_old.x.array.copy())
+    tmp["T_w"].append(T_w_old.x.array.copy())
+    tmp["k_rel"].append(krel.x.array.copy())
+    tmp["times"].append(t)
+    with open("./Masterarbeit/solutions/" + filename + ".pkl", "wb") as f:
+        pickle.dump(tmp, f)
+
+
+
+# Test function
+geom = Geometry(2, 1, 0)
+boundaries = {
+    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 1)), # lateral
+    2: lambda x: np.isclose(x[1], 2), # top
+    3: lambda x: np.isclose(x[1], 0)} # bottom
+bc_dict = {
+    "top_Ti": {
+        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_i"},
+    "top_Tw": {
+        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
+    "top_hw": {
+        "marker": 2, "name": "Neumann", "value": -1e-5, "variable": "h_w"},
+    "bottom_Ti": {
+        "marker": 3, "name": "Dirichlet", "value": -10, "variable": "T_i"}
+}
+
+initial_cond = {"h_w": -0.17, "phi": 0.592, "T_i": -10, "T_w": 0}
+solve_system("Moure_4h_LastTestCase", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=4*60*60, saving_interval=10)

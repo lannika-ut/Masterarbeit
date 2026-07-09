@@ -1,11 +1,8 @@
 To dos:
 Code
 - isotherm mit bulk temperature ausprobieren, falls alles nicht funktioniert
-- solve_system aufräumen und in Funktionen verpacken
-- schauen, wie man boundary conditions flexibler machen kann, ohne explizit immer angeben zu müssen bcs["top"] z.B.
 - view_solutions flexibler machen
 - Anfangsbedingung Wasser: untersten 25 cm gesättigt, darüber hydrostatisch
-- Animation über Zeitschritte
 - ganz am Schluss: Code aufräumen, insb. function files.
 
 Poster/Präsentation
