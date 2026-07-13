@@ -385,4 +385,4 @@ bc_dict = {
 }
 
 initial_cond = {"h_w": -0.17, "phi": 0.592, "T_i": -10, "T_w": 0}
-solve_system("Moure_4h_LastTestCase", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=4*60*60, saving_interval=10)
+solve_system("Moure_1min_LastTestCase", geom, 0.005, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=10)

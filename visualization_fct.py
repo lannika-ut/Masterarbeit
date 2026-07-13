@@ -242,3 +242,28 @@ def get_grid(P0, P1, P2, P3, nx, nz):
 
 def create_animation():
     pass
+
+def view_boundaries(domain, facet_tags, tag):
+    # < visualise dofs of facets with pvista >
+
+    V = fem.FunctionSpace(domain, ("CG", 1))
+    grid = pv.UnstructuredGrid(*plot.vtk_mesh(domain))
+
+    # Locate degrees of freedom associated with the specific tag
+    facet_indices = facet_tags.indices[facet_tags.values == tag]
+    dofs = fem.locate_dofs_topological(V, domain.topology.dim - 1, facet_indices)
+
+    # return coords of highlighted nodes:
+    coords = V.tabulate_dof_coordinates()
+    dof_coords = coords[dofs]
+
+    # highlight dof coordinates:
+    points = pv.PolyData(dof_coords)
+    points["dofs"] = np.zeros(dof_coords.shape[0]) 
+
+    plotter = pv.Plotter()
+    plotter.add_mesh(grid, color="lightgray", show_edges=True)  # Show the mesh
+    plotter.add_points(points, color="red", point_size=10) # Show highlighted points
+    plotter.camera_position = [(7, 6, 1), (7, 6, 0), (0, 0, 0)] 
+    plotter.camera.zoom(0.18)  
+    plotter.show()
