@@ -129,3 +129,10 @@ Idee von Cirpka: In der Temperaturgleichung soll ich in den Mobilitätstermen, a
 
 13.07.2026 09:00 - 15:00 Uhr
 Mit SUPG beschäftigt und versucht zu verstehen. Mega gute Videos von Stein Stoter. Ich glaube, evtl was der Cirpka meinte, ist, dass man eine künstliche Diffusion entlang der Strömung tau*q*q^T mit reinbringt. Das ist jetzt zwar inkonsistent und nicht wirklich SUPG, aber die Idee wärs glaub circa. Außerdem weiß ich gar nicht, ob das wirklich so geht mit SUPG, weil meine Gleichung dafür glaub nicht die richtige ist. Anne morgen fragen, wie ich das implementieren soll. Außerdem hab ich noch zwei Tests gemacht mit einmal 1 cm und einmal 0.5 cm Auflösung, um zu schauen, ob es besser funktioniert, tut es aber nicht, es oszilliert trotzdem.
+
+14.07.2026 09:00 - 16:00 Uhr
+Besprechung mit Anne: residual saturation gekappt auf 10^(-6). hw kappe ich nicht. SUPG: inkonsistente Formulierung benutzen, da anscheinend wenn man komplett SUPG macht, dann die Oszillationen zwar schwächer werden, aber nicht verschwinden. Alternativ könnte man die Temperaturen DG1 machen und schauen, ob das schon hilft. Außerdem soll ich mal noch einen Testfall von Heinze machen.
+Damit habe ich mich dann als erstes mit beschäftigt, aber ich glaub da hab ich irgendwas verkackt, das sieht ultra unrealistisch aus. Aber ich hab jetzt nochmal Moure mit DG1 versucht und das scheint besser zu funktionieren. Zumindest oszilliert das dann nicht mehr. Allerdings ist die Eistemperatur nach 10 s schon bei -0.02°C direkt, nachdem sie am Anfang -1°C war. Das scheint mir doch recht schnell. 
+To do: Aussickerung programmieren oder Infiltration nach einer gewissen Zeit stoppen
+Ich glaub, irgendwas klappt nicht richtig wenn ich einen Dirichlet-Randbedingung für hw mache, dann explodiert die Wassertemperatur???
+Also irgendwas mach ich definitiv falsch bei der Dirichlet-Randbedingung da geht gar nichts, noch nicht mal beim isothermal. Ich weiß auch nicht sicher, ob das evtl die Randbedingung für "du" sein müsste und nicht nur "u"??? Das war glaub so, als ich mal das Newton Verfahren von Hand programmiert hatte.

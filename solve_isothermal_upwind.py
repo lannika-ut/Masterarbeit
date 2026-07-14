@@ -130,7 +130,7 @@ def solve_system(
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=[])
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=[bcs["bottom"]])
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -204,6 +204,8 @@ boundaries = {
 bc_dict = {
     "top": {
         "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
+    "bottom": {
+        "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], "variable": "h_w"},
 }
 
 layer_params = {
@@ -216,7 +218,7 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_test_newparams.pkl"
+filename = "./Masterarbeit/solutions/isothermal_test_Dirichlet.pkl"
 solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
 
 

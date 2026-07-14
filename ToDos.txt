@@ -4,9 +4,7 @@ Code
 - view_solutions flexibler machen
 - Anfangsbedingung Wasser: untersten 25 cm gesättigt, darüber hydrostatisch
 - ganz am Schluss: Code aufräumen, insb. function files.
-
-Poster/Präsentation
-- überlegen, was ich dazu sagen will (elevator pitch 2 - 5 min)
+- zeitabhängige Randbedingungen einprogrammieren
 
 Report
 - finite Elemente richtig beschreiben

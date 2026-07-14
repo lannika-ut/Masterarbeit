@@ -102,6 +102,20 @@ def apply_initial_condition(f, ini):
 
 def solve_system(
         filename, geom, delta_x, boundaries, bc_dict, initial_conditions, layer_params=None, delta_t = 0.5, T_end=24*60*60, saving_interval=60):
+    """Solve the full system with mass conservation and local thermal non-equilibrium.
+
+    Args:
+        filename (string): Filename (and foldername) where results should be saved to.
+        geom (Geometry): The geometry of the domain (includes height, length, slope).
+        delta_x (float): The resolution.
+        boundaries (_type_): _description_
+        bc_dict (_type_): _description_
+        initial_conditions (_type_): _description_
+        layer_params (_type_, optional): _description_. Defaults to None.
+        delta_t (float, optional): _description_. Defaults to 0.5.
+        T_end (_type_, optional): _description_. Defaults to 24*60*60.
+        saving_interval (int, optional): _description_. Defaults to 60.
+    """
     # Set up domain, fem structure
     nx = int(geom.length/delta_x)
     nz = int(geom.height/delta_x)
@@ -110,9 +124,9 @@ def solve_system(
     tdim = domain.topology.dim
     V_hw = functionspace(domain, ("CG", 1))
     v_hw = TestFunction(V_hw)
-    V_Ti = functionspace(domain, ("CG", 1))
+    V_Ti = functionspace(domain, ("DG", 1))
     v_Ti = TestFunction(V_Ti)
-    V_Tw = functionspace(domain, ("CG", 1))
+    V_Tw = functionspace(domain, ("DG", 1))
     v_Tw = TestFunction(V_Tw)
     Q = functionspace(domain, ("DG", 0))
     x = SpatialCoordinate(domain)
@@ -191,6 +205,7 @@ def solve_system(
     )
 
     # Boundary conditions
+    print_bc = bc_dict.copy()
     bc = BoundaryCondition(domain, boundaries)
     for key, d in bc_dict.items():
         if d["variable"] == "h_w":
@@ -224,7 +239,6 @@ def solve_system(
                 bc_D_Ti.append(bcs[key])
             elif d["variable"] == "T_w":
                 bc_D_Tw.append(bcs[key])
-    print(bc_D_hw, bc_D_Ti, bc_D_Tw)
     
     # Create solver structure
     snes1 = PETSc.SNES().create()
@@ -264,6 +278,7 @@ def solve_system(
         "times": [],
         "k_rel":[],
         "saving_interval": saving_interval,
+        "boundary_condition": str(print_bc),
     }
     tmp["h_w"].append(h_w_old.x.array.copy())
     tmp["phi"].append(phi_old.x.array.copy())
@@ -343,7 +358,7 @@ def solve_system(
 
         h_w_old.x.array[:] = h_w.x.array
         phi_old.x.array[:] = phi.x.array
-        #validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
+        validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
         delta_t.value = new_dt
         t += float(delta_t.value)
 
@@ -368,10 +383,10 @@ def solve_system(
 
 
 # Test function
-geom = Geometry(2, 1, 0)
+geom = Geometry(0.5, 0.25, 0)
 boundaries = {
-    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 1)), # lateral
-    2: lambda x: np.isclose(x[1], 2), # top
+    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 0.25)), # lateral
+    2: lambda x: np.isclose(x[1], 0.5), # top
     3: lambda x: np.isclose(x[1], 0)} # bottom
 bc_dict = {
     "top_Ti": {
@@ -379,10 +394,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Neumann", "value": -1e-5, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 3, "name": "Dirichlet", "value": -10, "variable": "T_i"}
+        "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.17, "phi": 0.592, "T_i": -10, "T_w": 0}
-solve_system("Moure_1min_LastTestCase", geom, 0.005, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=10)
+initial_cond = {"h_w": -0.3, "phi": 0.468, "T_i": -5, "T_w": 0}
+solve_system("Crippa_1h_TotalRefreezing", geom, 0.01, boundaries, bc_dict, initial_cond, T_end=1*60*60, saving_interval=10)
