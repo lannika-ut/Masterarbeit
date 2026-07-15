@@ -21,11 +21,12 @@ from ufl import (
     SpatialCoordinate, TestFunction, TrialFunction,
     rhs, lhs, system,
 )
-from dolfinx import mesh
+from dolfinx import mesh, fem
 from petsc4py import PETSc
 import pickle
 
-def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t, min_dt=1e-2):
+def solve_Richards(
+        h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, min_dt=1e-2):
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
     snes.setFunction(problem.F, b)  # assemble residual
@@ -53,6 +54,11 @@ def solve_Richards(h_w, h_w_old, snes, problem, b, J, delta_t, t, min_dt=1e-2):
         # Newton actually failed (not just "slow") -> always halve dt,
         # no floor check here.
         if float(delta_t.value) <= min_dt:
+            # Save data so far:
+            tmp["h_w"].append(h_w_old.x.array.copy())
+            foldername = "./Masterarbeit/solutions/debug/"
+            with open(foldername + filename + ".pkl", "wb") as f:
+                pickle.dump(tmp, f)
             raise RuntimeError(
                 f"Solver failed to converge (reason {converged}) even at "
                 f"the minimum time step {min_dt} s, t={t/3600:.2f} h."
@@ -99,7 +105,7 @@ def solve_system(
     t = 0.0
 
     # Initial conditions
-    h_w_ini = -0.3
+    h_w_ini = -0.22
     h_w_old = Function(V_hw)
     h_w_old.name = "h_w_old"
     h_w_old.x.array[:] = h_w_ini*np.ones_like(h_w_old.x.array)
@@ -118,6 +124,8 @@ def solve_system(
                 p.theta(p.S_e(h_w_old), phi)) / delta_t * dx
         + dot(grad(v_hw), (p.K_s(phi)*krel*grad(x[1]+h_w))) * dx
     )
+
+    # Boundary conditions
     bc = BoundaryCondition(domain, boundaries)
     for d in bc_dict.values():
         if d["variable"] == "h_w":
@@ -125,12 +133,18 @@ def solve_system(
             d["testfunction"] = v_hw
             d["problem"] = F_hw
     bcs = bc.make_boundary_condition(bc_dict)
-    F_hw += bcs["top"]
+    print(bcs)
+    #F_hw += bcs["top"]
+    # Dirichlet by hand
+    dofs_D = fem.locate_dofs_geometrical(V_hw, top)
+    u_D = fem.Function(V_hw)
+    u_D.x.array[:] = 0.1
+    bc_D = fem.dirichletbc(u_D, dofs_D)
 
     # Create Newton solver
     snes = PETSc.SNES().create()
     # Set up nonlinear problem
-    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=[bcs["bottom"]])
+    problem_hw = NonlinearPDE_SNESProblem(F_hw, h_w, bc=[bcs["top"], bcs["bottom"]])
     b_hw = create_vector(V_hw)
     J_hw = create_matrix(problem_hw.a)
 
@@ -147,7 +161,7 @@ def solve_system(
     tmp["h_w"].append(h_w_old.x.array.copy())
     tmp["times"].append(t)
     tmp["krel"].append(krel.x.array.copy())
-    next_saving_time = 3600
+    next_saving_time = 10
 
     # Time loop
     while t <= T_end:
@@ -157,13 +171,13 @@ def solve_system(
         krel.x.scatter_forward()
         # Solve Richards
         h_w, repeat_time_step, delta_t = solve_Richards(
-            h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t)
+            h_w, h_w_old, snes, problem_hw, b_hw, J_hw, delta_t, t, tmp, filename)
         if repeat_time_step:
             continue
 
         # save temporary data
         if save_tmp and t >= next_saving_time:
-            next_saving_time += 3600
+            next_saving_time += 10
             tmp["h_w"].append(h_w.x.array.copy())
             tmp["times"].append(t)
             tmp["krel"].append(krel.x.array.copy())
@@ -178,7 +192,7 @@ def solve_system(
         tmp["times"].append(t)
         tmp["krel"].append(krel.x.array.copy())
         # dump temporary data into pickle file
-        with open(filename, "wb") as f:
+        with open("./Masterarbeit/solutions/" + filename + ".pkl", "wb") as f:
             pickle.dump(tmp, f)
 
 # Set up geometry
@@ -203,7 +217,7 @@ boundaries = {
 }
 bc_dict = {
     "top": {
-        "marker": 2, "name": "Neumann", "value": -2e-9, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
     "bottom": {
         "marker": 1, "name": "Dirichlet", "value": lambda x: -x[1], "variable": "h_w"},
 }
@@ -218,8 +232,8 @@ layer_params = {
         "rho_s": 489,
         "locator": lambda x: x[1] < slope*x[0] + P3[1]/2 - 1e-14}
 }
-filename = "./Masterarbeit/solutions/isothermal_test_Dirichlet.pkl"
-solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, layer_params=layer_params)
+filename = "isothermal_test_Dirichlet"
+solve_system(geom, delta_x, boundaries, bc_dict, save_tmp=True, filename=filename, T_end=60*60)
 
 
 

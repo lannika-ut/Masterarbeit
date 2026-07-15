@@ -25,7 +25,7 @@ from petsc4py import PETSc
 import pickle
 
 def solve_Richards(
-        h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename):
+        h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
     new_dt = delta_t.value
     repeat_time_step = False
@@ -55,6 +55,9 @@ def solve_Richards(
         if float(delta_t.value) <= min_dt:
             # Save data so far:
             tmp["h_w"].append(h_w_old.x.array.copy())
+            tmp["phi"].append(phi.x.array.copy())
+            tmp["T_i"].append(Ti.x.array.copy())
+            tmp["T_w"].append(Tw.x.array.copy())
             foldername = "./Masterarbeit/solutions/debug/"
             with open(foldername + filename + ".pkl", "wb") as f:
                 pickle.dump(tmp, f)
@@ -75,7 +78,7 @@ def solve_Richards(
         new_dt = max(0.5*float(delta_t.value), min_dt)
         repeat_time_step = True
         return h_w, repeat_time_step, new_dt
-    if num_iter < 3 and float(delta_t.value) < 7:
+    if num_iter < 3 and float(delta_t.value) < 0.5:
         new_dt = min(float(delta_t.value)*1.2, 7)
     print(
         f"Solver converged after {num_iter} iterations, reason {converged}. "
@@ -124,9 +127,9 @@ def solve_system(
     tdim = domain.topology.dim
     V_hw = functionspace(domain, ("CG", 1))
     v_hw = TestFunction(V_hw)
-    V_Ti = functionspace(domain, ("DG", 1))
+    V_Ti = functionspace(domain, ("CG", 1))
     v_Ti = TestFunction(V_Ti)
-    V_Tw = functionspace(domain, ("DG", 1))
+    V_Tw = functionspace(domain, ("CG", 1))
     v_Tw = TestFunction(V_Tw)
     Q = functionspace(domain, ("DG", 0))
     x = SpatialCoordinate(domain)
@@ -308,7 +311,7 @@ def solve_system(
 
         # Solve Richards
         h_w1, repeat_time_step, new_dt = solve_Richards(
-            h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename)
+            h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename, phi1, T_i_old, T_w_old)
         if repeat_time_step:
             delta_t.value = new_dt
             continue
@@ -317,19 +320,20 @@ def solve_system(
         new_krel = p.upwind_krel(h_w1, domain)
         krel.x.array[:] = new_krel.x.array
         krel.x.scatter_forward()
-       
+
         # Solve Thermodynamics
         problem_Ti = LinearProblem(
             a_Ti, L_Ti, bcs=bc_D_Ti, 
             petsc_options=petsc_options, petsc_options_prefix="T_i")
         T_i_h = problem_Ti.solve()
-        T_i_h.x.array[:] = np.clip(T_i_h.x.array, None, p.T_melt.value + eps)
+        print(f"max T_i: {np.max(T_i_h.x.array)} min T_i: {np.min(T_i_h.x.array)}")
+        #T_i_h.x.array[:] = np.clip(T_i_h.x.array, None, p.T_melt.value + eps)
         T_i_old.x.array[:] = T_i_h.x.array
         problem_Tw = LinearProblem(
             a_Tw, L_Tw, bcs=bc_D_Tw, 
             petsc_options=petsc_options, petsc_options_prefix="T_w")
         T_w_h = problem_Tw.solve()
-        T_w_h.x.array[:] = np.clip(T_w_h.x.array, p.T_melt.value - eps, None)
+        #T_w_h.x.array[:] = np.clip(T_w_h.x.array, p.T_melt.value - eps, None)
         T_w_old.x.array[:] = T_w_h.x.array
 
         # Update source term with new values
@@ -344,7 +348,7 @@ def solve_system(
 
         # Solve Richards again
         h_w, repeat_time_step, dontusethistimestep = solve_Richards(
-            h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename)
+            h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename, phi, T_i_h, T_w_h)
 
         # save temporary data
         if t >= next_saving_time:
@@ -358,7 +362,7 @@ def solve_system(
 
         h_w_old.x.array[:] = h_w.x.array
         phi_old.x.array[:] = phi.x.array
-        validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
+        #validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
         delta_t.value = new_dt
         t += float(delta_t.value)
 
@@ -383,10 +387,12 @@ def solve_system(
 
 
 # Test function
-geom = Geometry(0.5, 0.25, 0)
+height = 2
+length = 1
+geom = Geometry(height, length)
 boundaries = {
-    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], 0.25)), # lateral
-    2: lambda x: np.isclose(x[1], 0.5), # top
+    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], length)), # lateral
+    2: lambda x: np.isclose(x[1], height), # top
     3: lambda x: np.isclose(x[1], 0)} # bottom
 bc_dict = {
     "top_Ti": {
@@ -394,10 +400,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 1, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.3, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("Crippa_1h_TotalRefreezing", geom, 0.01, boundaries, bc_dict, initial_cond, T_end=1*60*60, saving_interval=10)
+initial_cond = {"h_w": -0.2, "phi": 0.468, "T_i": lambda x: 5*x[1]/height-5, "T_w": 0}
+solve_system("Crippa_1h_TotalRefreezing_icegradient", geom, 0.1, boundaries, bc_dict, initial_cond, T_end=1*60*60, saving_interval=10)

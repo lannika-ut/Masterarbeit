@@ -14,6 +14,7 @@ Report
 - Methods: numerische Implementierung (= Eigenleistung)
 - Results & Discussion in einem: Beschreibung der Test Cases, Ergebnisse und Diskussion je Test Case in einem Kapitel, nicht in separaten Kapiteln
 - Conclusion
+- Diskussion über Parameterinkonsistenz und Abhängigkeit davon ob der Code konvergiert oder nicht
 
 Theorie
 - andere Parametrisierungen von W_SSA?

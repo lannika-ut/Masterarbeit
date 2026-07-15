@@ -25,16 +25,16 @@ class Parameter:
                         ...
                     }
         """
-        self.rho_i = fem.Constant(domain, PETSc.ScalarType(917))  # kg/m^3
+        self.rho_i = fem.Constant(domain, PETSc.ScalarType(919))  # kg/m^3
         self.rho_w = fem.Constant(domain, PETSc.ScalarType(1000))  # kg/m^3
-        self.mu_w = fem.Constant(domain, PETSc.ScalarType(1.7e-3))  # kg/(m*s)
+        self.mu_w = fem.Constant(domain, PETSc.ScalarType(1.792e-3))  # kg/(m*s)
         self.g = fem.Constant(domain, PETSc.ScalarType(9.81))  # m/s^2
 
         # Thermal properties
         self.c_pw = fem.Constant(domain, PETSc.ScalarType(4200))  # J/(kg*°C)
-        self.c_pi = fem.Constant(domain, PETSc.ScalarType(2040))  # J/(kg*°C)
-        self.K_i = fem.Constant(domain, PETSc.ScalarType(2.2))  # W/(m*°C)
-        self.K_w = fem.Constant(domain, PETSc.ScalarType(0.55))  # W/(m*°C)
+        self.c_pi = fem.Constant(domain, PETSc.ScalarType(1960))  # J/(kg*°C)
+        self.K_i = fem.Constant(domain, PETSc.ScalarType(2.29))  # W/(m*°C)
+        self.K_w = fem.Constant(domain, PETSc.ScalarType(0.554))  # W/(m*°C)
         self.T_melt = fem.Constant(domain, PETSc.ScalarType(0))  # °C
         self.L_sol = fem.Constant(domain, PETSc.ScalarType(3.34e5))  # J/kg
         self.beta_sol = fem.Constant(domain, PETSc.ScalarType(800))  # s/m
@@ -63,12 +63,12 @@ class Parameter:
             self.layer_params_dict = layer_params
         else:  # homogeneous snow
             self.is_layered = False
-            self.d_i = fem.Constant(domain, PETSc.ScalarType(2e-3))  # m
+            self.d_i = fem.Constant(domain, PETSc.ScalarType(0.423e-3))  #2e-3 m
             self.r_i = fem.Constant(domain,
                                     PETSc.ScalarType(0.06*self.d_i.value))  # m
             self.r_w = fem.Constant(domain,
                                     PETSc.ScalarType(1.35*self.d_i.value))  # m
-            self.rho_s = fem.Constant(domain, PETSc.ScalarType(350))  # kg/m^3
+            self.rho_s = fem.Constant(domain, PETSc.ScalarType(489))  # 350kg/m^3
             a = (4.4e6) * (self.rho_s.value/self.d_i.value)**(-0.98)  # 1/m
             n = 1 + (2.7e-3) * (self.rho_s.value/self.d_i.value)**(0.61)
             self.alpha = fem.Constant(domain, PETSc.ScalarType(a))
@@ -77,7 +77,7 @@ class Parameter:
                 domain, PETSc.ScalarType(self.calc_min_hw()))
 
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
-        self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
+        self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(3514))  #4114 1/m
 
     def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
