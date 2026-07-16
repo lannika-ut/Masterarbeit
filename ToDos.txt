@@ -5,6 +5,7 @@ Code
 - Anfangsbedingung Wasser: untersten 25 cm gesättigt, darüber hydrostatisch
 - ganz am Schluss: Code aufräumen, insb. function files.
 - zeitabhängige Randbedingungen einprogrammieren
+- Gewichte für T_int auch für geschichteten Fall einprogrammieren (in Parametrizations)
 
 Report
 - finite Elemente richtig beschreiben

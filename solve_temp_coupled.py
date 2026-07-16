@@ -27,6 +27,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
+    max_dt = 5
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -63,11 +64,11 @@ def solve_Richards(
                 pickle.dump(tmp, f)
             raise RuntimeError(
                 f"Solver failed to converge (reason {converged}) even at "
-                f"the minimum time step {min_dt} s, t={t/3600:.2f} h."
+                f"the minimum time step {min_dt} s, t={t/3600:.4f} h."
             )
         new_dt = max(0.5*float(delta_t.value), min_dt)
         print(f"Newton diverged (reason {converged}), halving dt to "
-              f"{new_dt:.2f} s and retrying t={t/3600:.2f} h.")
+              f"{new_dt:.3f} s and retrying t={t/3600:.4f} h.")
         repeat_time_step = True
         return h_w, repeat_time_step, new_dt
     
@@ -78,11 +79,11 @@ def solve_Richards(
         new_dt = max(0.5*float(delta_t.value), min_dt)
         repeat_time_step = True
         return h_w, repeat_time_step, new_dt
-    if num_iter < 3 and float(delta_t.value) < 7:
-        new_dt = min(float(delta_t.value)*1.2, 7)
+    if num_iter < 3 and float(delta_t.value) < max_dt:
+        new_dt = min(float(delta_t.value)*1.2, max_dt)
     print(
         f"Solver converged after {num_iter} iterations, reason {converged}. "
-        f"dt = {delta_t.value:.2f} s at t={t/3600:.2f} h.")
+        f"dt = {delta_t.value:.3f} s at t={t/3600:.4f} h.")
     return h_w, repeat_time_step, new_dt
 
 def validate_state(h_w, phi, T_i, T_w, label="State"):
@@ -195,20 +196,23 @@ def solve_system(
         - v_hw*p.rho_i/p.rho_w*source_mass*dx
     )
     q1 = p.K_s(phi1)*krel*grad(x[1]+h_w1)
+    eps = 10*np.finfo(np.float64).eps*0
+    a_i = (p.K_i/p.r_i)/(p.K_i/p.r_i + p.K_w/p.r_w + p.rho_w*p.L_sol*p.R_m)
+    a_w = (p.K_w/p.r_w)/(p.K_i/p.r_i + p.K_w/p.r_w + p.rho_w*p.L_sol*p.R_m)
     F_Ti = (
         v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
         - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
-        (p.T_int(T_i_old, T_w_old)-T_i)/p.r_i * dx
-        + dot(grad(v_Ti), tau/dot(q1,q1)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
+        ((a_i-1)*T_i + a_w*T_w_h)/p.r_i * dx
+        #+ dot(grad(v_Ti), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
     )
     F_Tw = (
         v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
         + dot(grad(v_Tw), (p.D_w*p.theta(p.S_e(h_w1), phi1)*grad(T_w)
                         + p.K_s(phi1)*krel*grad(x[1]+h_w1)*T_w)) * dx
         - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) *
-        (p.T_int(T_i_old, T_w_old) - T_w)/p.r_w * dx
-        + dot(grad(v_Tw), tau/dot(q1,q1)*outer(q1,q1)*grad(T_w)) * dx # artificial diffusion
+        (a_i*T_i_h + (a_w-1)*T_w)/p.r_w * dx
+        #+ dot(grad(v_Tw), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_w)) * dx # artificial diffusion
     )
 
     # Boundary conditions
@@ -325,18 +329,30 @@ def solve_system(
         krel.x.array[:] = new_krel.x.array
         krel.x.scatter_forward()
         
-        # Solve Thermodynamics
-        problem_Ti = LinearProblem(
-            a_Ti, L_Ti, bcs=bc_D_Ti, 
-            petsc_options=petsc_options, petsc_options_prefix="T_i")
-        T_i_h = problem_Ti.solve()
-        #T_i_h.x.array[:] = np.clip(T_i_h.x.array, None, p.T_melt.value + eps)
+        # Solve Thermodynamics in Picard Loop
+        T_i_h.x.array[:] = T_i_old.x.array
+        T_w_h.x.array[:] = T_w_old.x.array
+        for k in range(5):
+            Ti_old_picard = T_i_h.x.array.copy()
+            Tw_old_picard = T_w_h.x.array.copy()
+            problem_Tw = LinearProblem(
+                a_Tw, L_Tw, bcs=bc_D_Tw, 
+                petsc_options=petsc_options, petsc_options_prefix="T_w")
+            T_w_new = problem_Tw.solve()
+            T_w_h.x.array[:] = T_w_new.x.array
+            T_w_h.x.scatter_forward()
+            problem_Ti = LinearProblem(
+                a_Ti, L_Ti, bcs=bc_D_Ti, 
+                petsc_options=petsc_options, petsc_options_prefix="T_i")
+            T_i_new = problem_Ti.solve()
+            T_i_h.x.array[:] = T_i_new.x.array
+            T_i_h.x.scatter_forward()
+            err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
+            err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
+            print(k, err_i, err_w)
+            k += 1
+        # Update temperatures
         T_i_old.x.array[:] = T_i_h.x.array
-        problem_Tw = LinearProblem(
-            a_Tw, L_Tw, bcs=bc_D_Tw, 
-            petsc_options=petsc_options, petsc_options_prefix="T_w")
-        T_w_h = problem_Tw.solve()
-        #T_w_h.x.array[:] = np.clip(T_w_h.x.array, p.T_melt.value - eps, None)
         T_w_old.x.array[:] = T_w_h.x.array
 
         # Update source term with new values
@@ -408,5 +424,5 @@ bc_dict = {
         "marker": 3, "name": "Dirichlet", "value": -10, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.4, "phi": 0.592, "T_i": lambda x: 10*x[1]/height-10, "T_w": 0}
-solve_system("Moure_test_temp_1h", geom, 0.01, boundaries, bc_dict, initial_cond, T_end=60*60, saving_interval=1)
+initial_cond = {"h_w": -0.35, "phi": 0.468, "T_i": lambda x: 10*x[1]/height-10, "T_w": lambda x: 10*x[1]/height-10}
+solve_system("test2_coupling_sameinitemp", geom, 0.1, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)

@@ -137,7 +137,10 @@ To do: Aussickerung programmieren oder Infiltration nach einer gewissen Zeit sto
 Ich glaub, irgendwas klappt nicht richtig wenn ich einen Dirichlet-Randbedingung für hw mache, dann explodiert die Wassertemperatur???
 Also irgendwas mach ich definitiv falsch bei der Dirichlet-Randbedingung da geht gar nichts, noch nicht mal beim isothermal. Ich weiß auch nicht sicher, ob das evtl die Randbedingung für "du" sein müsste und nicht nur "u"??? Das war glaub so, als ich mal das Newton Verfahren von Hand programmiert hatte.
 
-15.07.2026 07:30 - 08:15, 
+15.07.2026 07:30 - 08:15, 13:00 - 16:00 Uhr
 Also es liegt glaub nicht an nonlinear_snes_problem, es funktioniert nämlich im alten Code unter Scientific Practice ganz hervorragend mit den Dirichlet-Randbedingungen. Actually, sind vielleicht die Parametrisierungen super hässlich, weil wenn ich es mit genau den gleichen Parametern im alten Code probiere, dann funktioniert es auch gar nicht. V.a. alpha ist super hoch
 Actually glaub ich, dass die Dirichlet-Randbedingungen funktionnieren, das hab ich jetzt grad getestet. Es liegt tatsächlich an den Parametrisierungen!!!
 Ich hab jetzt die Temperaturen wieder auf CG1 gemacht, weil wenn man die auf DG1 lässt, oszillieren sie zwar nicht, aber dann geht halt wieder die Eistemperatur fast direkt auf 0°C überall und chatgpt meint, dass das vermutlich an der DG1 Implementierung liegt und dass das nicht so direkt übertragbar ist mit CG1 auf DG1, weil man da irgendwie den flux across faces noch parametrisieren muss. Also hab ich das halt wieder geändert und jetzt oszilliert es freudig hin und her. Also sollte ich dann morgen wirklich überlegen wie genau das mit dem artificial diffundieren funktionieren soll. Ist doch mega kacke man.
+
+16.07.2026 09:00 - 16:30 Uhr
+Ich hab jetzt eine künstliche streamline Diffusion eingebaut und jetzt oszilliert die Temperatur tatsächlich nicht mehr. Allerdings ändern sich die Temperaturen immer noch viel zu schnell, evtl liegt das jetzt daran, dass die Temperaturgleichung gar nicht gekoppelt sind. Also versuch ich jetzt glaub einfach mal einen Picard-Approach von chat vorgeschlagen, den muss ich jetzt dann mal einprogrammieren. Hab jetzt die Picard-Iteration implementiert. Oszilliert immer noch, bzw wenn ich diffundiere gehts halt schnell auf 0°C. Irgendwas ist glaub falsch, aber ich finds einfach nicht...

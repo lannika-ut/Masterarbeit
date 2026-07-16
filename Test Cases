@@ -1,2 +1,3 @@
 Moure: mit DG1-Temperaturen, DG0-Porosität, CG1 Wasserdruck, Infiltration -1e-6 m/s, andere Parameter als Moure, kein outflow unten. Seit DG1 Temperaturen keine Oszillation mehr unten. Ah, aber ich hab auch das Gebiet auf 0.25 x 0.5 m^2 begrenzt.
 
+Moure_test_temp: Wasser infiltriert endlich mit ner gescheiten Geschwindigkeit (weil Anfangsbedingung trocken genug), aber Eistemperatur geht immer noch super schnell auf 0°C.
