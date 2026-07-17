@@ -182,7 +182,7 @@ def solve_system(
     source_mass.name = "source_mass"
 
     # Weak formulation
-    tau = Constant(domain, PETSc.ScalarType(0.1))
+    tau = Constant(domain, PETSc.ScalarType(0.05))
     F_hw1 = (
         v_hw * (p.theta(p.S_e(h_w), phi1) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
@@ -204,7 +204,7 @@ def solve_system(
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
         - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
         ((a_i-1)*T_i + a_w*T_w_h)/p.r_i * dx
-        #+ dot(grad(v_Ti), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
+        + dot(grad(v_Ti), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
     )
     F_Tw = (
         v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
@@ -212,7 +212,7 @@ def solve_system(
                         + p.K_s(phi1)*krel*grad(x[1]+h_w1)*T_w)) * dx
         - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) *
         (a_i*T_i_h + (a_w-1)*T_w)/p.r_w * dx
-        #+ dot(grad(v_Tw), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_w)) * dx # artificial diffusion
+        + dot(grad(v_Tw), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_w)) * dx # artificial diffusion
     )
 
     # Boundary conditions
@@ -424,5 +424,5 @@ bc_dict = {
         "marker": 3, "name": "Dirichlet", "value": -10, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.35, "phi": 0.468, "T_i": lambda x: 10*x[1]/height-10, "T_w": lambda x: 10*x[1]/height-10}
-solve_system("test2_coupling_sameinitemp", geom, 0.1, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)
+initial_cond = {"h_w": -0.2, "phi": 0.468, "T_i": lambda x: 10*x[1]/height-10, "T_w": lambda x: 10*x[1]/height-10}
+solve_system("test3_coupling_newwssa_newtint", geom, 0.1, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)

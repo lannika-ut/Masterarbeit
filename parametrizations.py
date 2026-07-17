@@ -48,7 +48,8 @@ class Parameter:
         self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))  # m^2/s
 
         self.layer_params_dict = layer_params
-        self.S_r = fem.Constant(domain, PETSc.ScalarType(1e-6)) # residual saturation
+        self.S_emin = fem.Constant(domain, PETSc.ScalarType(1e-6)) # minimum effective saturation
+        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3)) # residual saturation
         # snow/van Genuchten parameters
         if layer_params is not None:
             self.is_layered = True
@@ -67,7 +68,7 @@ class Parameter:
             self.r_i = fem.Constant(domain,
                                     PETSc.ScalarType(0.06*self.d_i.value))  # m
             self.r_w = fem.Constant(domain,
-                                    PETSc.ScalarType(1.35*self.d_i.value))  # m
+                                    PETSc.ScalarType(1.35*self.r_i.value))  # m
             self.rho_s = fem.Constant(domain, PETSc.ScalarType(489))  # 350kg/m^3
             a = (4.4e6) * (self.rho_s.value/self.d_i.value)**(-0.98)  # 1/m
             n = 1 + (2.7e-3) * (self.rho_s.value/self.d_i.value)**(0.61)
@@ -122,9 +123,10 @@ class Parameter:
                     n_vals[c] = 1 + (2.7e-3) * (
                         (value["rho_s"]/value["d_i"])**(0.61))
                     ri_vals[c] = 0.06*value["d_i"]
-                    rw_vals[c] = 1.35*value["d_i"]
-                    minhw_vals[c] = (-(self.S_r.value**(n_vals[c]/(1-n_vals[c]))
-                                       - 1)**(1/n_vals[c])/alpha_vals[c])
+                    rw_vals[c] = 1.35*ri_vals[c]
+                    minhw_vals[c] = (
+                        -(self.S_emin.value**(n_vals[c]/(1-n_vals[c])) - 1)
+                        **(1/n_vals[c])/alpha_vals[c])
 
         # Fill functions with right values
         alpha.x.array[:] = alpha_vals
@@ -153,10 +155,14 @@ class Parameter:
                  }
         return _dict
 
+    def saturation(self, Se, phi):
+        """Calculate real saturation S=theta/phi"""
+        return (0.9 - self.theta_r/phi)*Se + self.theta_r/phi
+
     def calc_min_hw(self):
         """Calculate min. pressure head such that saturation stays above 0.001."""
         minhw = (
-            -(self.S_r.value**(self.N.value/(1-self.N.value))
+            -(self.S_emin.value**(self.N.value/(1-self.N.value))
               - 1)**(1/self.N.value)/self.alpha.value)
         return minhw
 
@@ -194,20 +200,24 @@ class Parameter:
     def T_int(self, T_i, T_w, T_intold=None):
         """Calculate the interface temperature after Moure et al. (2023)."""
         # rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
-        rho = self.rho_w
-        numerator = (self.K_i/self.r_i*T_i
-                     + self.K_w/self.r_w*T_w
-                     + rho*self.L_sol*self.R_m*self.T_melt)
-        denominator = (self.K_i/self.r_i
-                       + self.K_w/self.r_w
-                       + rho*self.L_sol * self.R_m)
+        weights = [
+            self.c_pw/self.L_sol,
+            self.beta_sol*self.K_i/(self.rho_w*self.L_sol*self.r_i),
+            self.beta_sol*self.K_w/(self.rho_w*self.L_sol*self.r_w)
+            ]
+        numerator = weights[0]*self.T_melt + weights[1]*T_i + weights[2]*T_w
+        denominator = weights[0] + weights[1] + weights[2]
         return numerator/denominator
 
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area. """
-        part1 = (Se - self.S_r) * ufl.ln(phi) * phi
         phi0 = 1 - self.rho_s/self.rho_i
-        return part1*self.SSA_0 / (phi0*ufl.ln(phi0))
+        S = self.saturation(Se, phi)
+        wssa = ufl.conditional(
+            S >= self.S_l,
+            (S - self.S_l)*self.SSA_0/(phi0*ufl.ln(phi0))*phi*ufl.ln(phi),
+            0)
+        return wssa
 
     def S_e_numerical(self, h_w):
         """Numerical evaluation of the effective saturation after van Genuchten."""
@@ -232,6 +242,11 @@ class Parameter:
         t = (self.theta_r.value
              + (0.9*np.array(phi.x.array)-self.theta_r.value)*Se)
         return t
+    
+    def saturation_numerical(self, Se, phi):
+        """Numerical evaluation of the real saturation."""
+        S = (0.9 - self.theta_r.value/phi)*Se + self.theta_r.value/phi
+        return S
 
     def T_int_numerical(self, T_i, T_w):
         """Numerical evaluation of T_int (as opposed to the symbolic one)."""
@@ -242,24 +257,30 @@ class Parameter:
         else:
             ri = self.r_i.value
             rw = self.r_w.value
-        weights = [self.K_i.value/ri,
-                   self.K_w.value/rw,
-                   rho*self.L_sol.value*self.R_m.value]
-        numerator = (weights[0]*np.array(T_i.x.array)
-                     + weights[1]*np.array(T_w.x.array)
-                     + weights[2]*self.T_melt.value)
+        weights = [
+            self.c_pw.value/self.L_sol.value,
+            self.beta_sol.value*self.K_i.value/(rho*self.L_sol.value*ri),
+            self.beta_sol.value*self.K_w.value/(rho*self.L_sol.value*rw)
+            ]
+        numerator = (weights[0]*self.T_melt.value
+                     + weights[1]*np.array(T_i.x.array)
+                     + weights[2]*np.array(T_w.x.array))                     
         denominator = (weights[0] + weights[1] + weights[2])
         return numerator/denominator
 
     def W_SSA_numerical(self, Se, phi):
         """Numerical evaluation of the wet specific surface area."""
-        part1 = ((Se-self.S_r.value)*np.array(phi.x.array) *
-                 np.log(np.array(phi.x.array)))
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
-        return part1*self.SSA_0.value / (phi0*np.log(phi0))
+        phi_arr = np.array(phi.x.array)
+        S = self.saturation_numerical(Se, np.array(phi.x.array))
+        reg_term = np.clip((S - self.S_l.value), 0, None)
+        wssa = (reg_term*self.SSA_0.value
+                / (phi0*np.log(phi0))
+                * phi_arr * np.log(phi_arr))
+        return wssa
 
     def calc_krel(self, hw, alpha, N, minhw):
         """Calculate the relative permeability for a given pressure head.
