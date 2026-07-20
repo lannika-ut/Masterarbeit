@@ -59,6 +59,7 @@ def solve_Richards(
             tmp["phi"].append(phi.x.array.copy())
             tmp["T_i"].append(Ti.x.array.copy())
             tmp["T_w"].append(Tw.x.array.copy())
+            tmp["times"].append(t)
             foldername = "./Masterarbeit/solutions/debug/"
             with open(foldername + filename + ".pkl", "wb") as f:
                 pickle.dump(tmp, f)
@@ -70,21 +71,18 @@ def solve_Richards(
         print(f"Newton diverged (reason {converged}), halving dt to "
               f"{new_dt:.3f} s and retrying t={t/3600:.4f} h.")
         repeat_time_step = True
-        return h_w, repeat_time_step, new_dt
-    
-    sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
-    h_w.x.scatter_forward()
+        return sol_vec, repeat_time_step, new_dt
     # Converged, but check if it was "slow" and should shrink dt anyway
     if num_iter > 10 and float(delta_t.value) > min_dt:
         new_dt = max(0.5*float(delta_t.value), min_dt)
         repeat_time_step = True
-        return h_w, repeat_time_step, new_dt
+        return sol_vec, repeat_time_step, new_dt
     if num_iter < 3 and float(delta_t.value) < max_dt:
         new_dt = min(float(delta_t.value)*1.2, max_dt)
     print(
         f"Solver converged after {num_iter} iterations, reason {converged}. "
         f"dt = {delta_t.value:.3f} s at t={t/3600:.4f} h.")
-    return h_w, repeat_time_step, new_dt
+    return sol_vec, repeat_time_step, new_dt
 
 def validate_state(h_w, phi, T_i, T_w, label="State"):
     print(f"\n{label} validation:")
@@ -196,9 +194,12 @@ def solve_system(
         - v_hw*p.rho_i/p.rho_w*source_mass*dx
     )
     q1 = p.K_s(phi1)*krel*grad(x[1]+h_w1)
-    eps = 10*np.finfo(np.float64).eps*0
-    a_i = (p.K_i/p.r_i)/(p.K_i/p.r_i + p.K_w/p.r_w + p.rho_w*p.L_sol*p.R_m)
-    a_w = (p.K_w/p.r_w)/(p.K_i/p.r_i + p.K_w/p.r_w + p.rho_w*p.L_sol*p.R_m)
+    eps = 10*np.finfo(np.float64).eps
+    weights_sum = (p.c_pw/p.L_sol
+                   + p.beta_sol/(p.rho_w*p.L_sol*p.r_i)
+                   + p.beta_sol/(p.rho_w*p.L_sol*p.r_w))
+    a_i = (p.beta_sol/(p.rho_w*p.L_sol*p.r_i))/weights_sum
+    a_w = (p.beta_sol/(p.rho_w*p.L_sol*p.r_w))/weights_sum
     F_Ti = (
         v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
@@ -236,12 +237,12 @@ def solve_system(
         if d["name"] == "Neumann":
             # update weak formulations with Neumann bc
             if d["variable"] == "h_w":
-                F_hw1 += bcs[key]
-                F_hw2 += bcs[key]
+                F_hw1 += -bcs[key]
+                F_hw2 += -bcs[key]
             elif d["variable"] == "T_i":
-                F_Ti += bcs[key]
+                F_Ti += -bcs[key]
             elif d["variable"] == "T_w":
-                F_Tw += bcs[key]
+                F_Tw += -bcs[key]
         elif d["name"] == "Dirichlet":
             # sort Dirichlet bc after variable
             if d["variable"] == "h_w":
@@ -263,7 +264,7 @@ def solve_system(
     J_hw2 = create_matrix(problem_hw2.a)
     # Set up linear solver options
     petsc_options = {
-        "ksp_error_if_not_converged": True,
+        "ksp_error_if_not_converged": False,
         "ksp_type": "gmres",
         "ksp_rtol": 1e-4,
         "ksp_atol": 1e-6,
@@ -303,12 +304,12 @@ def solve_system(
     while t <= T_end:
         # Upwind krel
         new_krel = p.upwind_krel(h_w_old, domain)
-        krel.x.array[:] = new_krel.x.array
+        krel.x.array[:] = new_krel.x.array.copy()
         krel.x.scatter_forward()
 
         # Calculate source term
         new_source = p.calc_source_term(h_w_old, phi_old, T_i_old, T_w_old)
-        source_mass.x.array[:] = new_source.x.array
+        source_mass.x.array[:] = new_source.x.array.copy()
         source_mass.x.scatter_forward()
 
         # Update porosity
@@ -318,46 +319,58 @@ def solve_system(
         phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
 
         # Solve Richards
-        h_w1, repeat_time_step, new_dt = solve_Richards(
+        sol_vec, repeat_time_step, new_dt = solve_Richards(
             h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename, phi1, T_i_old, T_w_old)
         if repeat_time_step:
             delta_t.value = new_dt
             continue
+        sol_vec.copy(h_w1.x.petsc_vec)  # copy solution into h_w1
+        h_w1.x.scatter_forward()
         
         # Update krel with new pressure head
         new_krel = p.upwind_krel(h_w1, domain)
-        krel.x.array[:] = new_krel.x.array
+        krel.x.array[:] = new_krel.x.array.copy()
         krel.x.scatter_forward()
-        
+
+        # Debug
+        cell = 400
+        hwdg0 = Function(Q)
+        hwdg0.interpolate(h_w1)
+        t1 = p.D_i.value*p.W_SSA_numerical(p.S_e_numerical(hwdg0), phi1)[cell]/p.r_i.value
+        t2 = (1 - phi1.x.array[cell])/delta_t.value
+        print(f"D_i*W_SSA/r_i = {t1}")
+        print(f"(1-phi)/dt = {t2}")
+
+
         # Solve Thermodynamics in Picard Loop
         T_i_h.x.array[:] = T_i_old.x.array
         T_w_h.x.array[:] = T_w_old.x.array
-        for k in range(5):
+        for k in range(1):
             Ti_old_picard = T_i_h.x.array.copy()
             Tw_old_picard = T_w_h.x.array.copy()
             problem_Tw = LinearProblem(
                 a_Tw, L_Tw, bcs=bc_D_Tw, 
                 petsc_options=petsc_options, petsc_options_prefix="T_w")
             T_w_new = problem_Tw.solve()
-            T_w_h.x.array[:] = T_w_new.x.array
+            T_w_h.x.array[:] = T_w_new.x.array.copy()
             T_w_h.x.scatter_forward()
             problem_Ti = LinearProblem(
                 a_Ti, L_Ti, bcs=bc_D_Ti, 
                 petsc_options=petsc_options, petsc_options_prefix="T_i")
             T_i_new = problem_Ti.solve()
-            T_i_h.x.array[:] = T_i_new.x.array
+            T_i_h.x.array[:] = T_i_new.x.array.copy()
             T_i_h.x.scatter_forward()
             err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
             err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
-            print(k, err_i, err_w)
+            #print(k, err_i, err_w)
             k += 1
         # Update temperatures
-        T_i_old.x.array[:] = T_i_h.x.array
-        T_w_old.x.array[:] = T_w_h.x.array
+        T_i_old.x.array[:] = T_i_h.x.array.copy()
+        T_w_old.x.array[:] = T_w_h.x.array.copy()
 
         # Update source term with new values
         new_source = p.calc_source_term(h_w1, phi1, T_i_h, T_w_h)
-        source_mass.x.array[:] = new_source.x.array
+        source_mass.x.array[:] = new_source.x.array.copy()
         source_mass.x.scatter_forward()
 
         # Update porosity again 
@@ -366,8 +379,10 @@ def solve_system(
         phi.x.array[:] = np.clip(phi.x.array, 0, 1)
 
         # Solve Richards again
-        h_w, repeat_time_step, dontusethistimestep = solve_Richards(
+        sol_vec, repeat_time_step, dontusethistimestep = solve_Richards(
             h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename, phi, T_i_h, T_w_h)
+        sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
+        h_w.x.scatter_forward()
 
         # save temporary data
         if t >= next_saving_time:
@@ -379,8 +394,8 @@ def solve_system(
             tmp["k_rel"].append(krel.x.array.copy())
             tmp["times"].append(t)
 
-        h_w_old.x.array[:] = h_w.x.array
-        phi_old.x.array[:] = phi.x.array
+        h_w_old.x.array[:] = h_w.x.array.copy()
+        phi_old.x.array[:] = phi.x.array.copy()
         #validate_state(h_w_old, phi_old, T_i_old, T_w_old, label="After correction")
         delta_t.value = new_dt
         t += float(delta_t.value)
@@ -419,10 +434,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Neumann", "value": -1e-5, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 1, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 3, "name": "Dirichlet", "value": -10, "variable": "T_i"}
+        "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.2, "phi": 0.468, "T_i": lambda x: 10*x[1]/height-10, "T_w": lambda x: 10*x[1]/height-10}
-solve_system("test3_coupling_newwssa_newtint", geom, 0.1, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)
+initial_cond = {"h_w": -0.2, "phi": 0.468, "T_i": -5, "T_w": 0}
+solve_system("test4_Crippa", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)

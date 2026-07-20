@@ -134,7 +134,7 @@ def solve_system(
             d["problem"] = F_hw
     bcs = bc.make_boundary_condition(bc_dict)
     print(bcs)
-    #F_hw += bcs["top"]
+    #F_hw += -bcs["top"]
     # Dirichlet by hand
     dofs_D = fem.locate_dofs_geometrical(V_hw, top)
     u_D = fem.Function(V_hw)

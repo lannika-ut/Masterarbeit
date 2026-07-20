@@ -145,7 +145,12 @@ Ich hab jetzt die Temperaturen wieder auf CG1 gemacht, weil wenn man die auf DG1
 16.07.2026 09:00 - 16:30 Uhr
 Ich hab jetzt eine künstliche streamline Diffusion eingebaut und jetzt oszilliert die Temperatur tatsächlich nicht mehr. Allerdings ändern sich die Temperaturen immer noch viel zu schnell, evtl liegt das jetzt daran, dass die Temperaturgleichung gar nicht gekoppelt sind. Also versuch ich jetzt glaub einfach mal einen Picard-Approach von chat vorgeschlagen, den muss ich jetzt dann mal einprogrammieren. Hab jetzt die Picard-Iteration implementiert. Oszilliert immer noch, bzw wenn ich diffundiere gehts halt schnell auf 0°C. Irgendwas ist glaub falsch, aber ich finds einfach nicht...
 
-17.07.2026 14:00 - 16:30 Uhr
+17.07.2026 14:00 - 17:00 Uhr
 r_w = 1.35*r_i korrigiert. Jetzt muss ich noch anpassen, dass W_SSA und min_hw mit der echten Sättigung S und nicht der effektiven Sättigung S_e arbeiten. Dafür muss ich W_SSA und min_hw auf jeden Fall nochmal komplett umschreiben und evtl auch alles wo S_r (bzw das sollte jetzt wirklich S_l=1e-3 heißen) vorkommt. Weil S_r = theta_r/phi und S = (Se(theta_s - theta_r)+theta_r)/phi.
 Hab ich umgeschrieben, jetzt funktioniert es noch weniger und konvergiert nicht.
 T_int auch nochmal geändert, obwohl ich glaub, dass das eigentlich das gleiche sein sollte. Hat auch keinen Unterschied gemacht. Scheiße.
+
+20.07.2026 09:30 - 16:00 Uhr
+korrigiertes W_SSA ist ca 100 - 350 1/m kleiner als vorheriges.
+Ich glaube die Parameterklasse stimmt jetzt.
+Vielleicht liegt das daran dass ich zu nass starte??? Ich glaub eigentlich nicht, aber na ja. Also ich finds nicht raus...
