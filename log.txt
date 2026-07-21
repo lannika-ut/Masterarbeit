@@ -157,4 +157,4 @@ Vielleicht liegt das daran dass ich zu nass starte??? Ich glaub eigentlich nicht
 
 21.07.2026 09:00 - Uhr
 Besprechung mit Anne:
-Ich glaub, dass es jetzt so degeneriert lag an der neuen Formulierung von W_SSA. Mit der alten Formulierung läuft es nämlich durch. Ich hab jetzt W_SSA = theta*... ausprobiert, das sieht auch bisschen besser aus, kriegt aber große Probleme, wenn es zu trocken wird, also macht der Regularisierungsterm wohl doch Sinn.
+Ich glaub, dass es jetzt so degeneriert lag an der neuen Formulierung von W_SSA. Mit der alten Formulierung läuft es nämlich durch. Ich hab jetzt W_SSA = theta*... ausprobiert, das sieht auch bisschen besser aus, kriegt aber große Probleme, wenn es zu trocken wird, also macht der Regularisierungsterm wohl doch Sinn. Ok, ich regularisiere jetzt mit theta-theta_r und jetzt funktioniert es ahhhhhhhh geiloooooo.

@@ -6,6 +6,7 @@ Code
 - zeitabhängige Randbedingungen einprogrammieren
 - Gewichte für T_int auch für geschichteten Fall einprogrammieren (in Parametrizations)
 - gekipptes Gebiet ausprobieren
+- unterschiedliche Parameter ausprobieren
 
 Report
 - finite Elemente richtig beschreiben
@@ -17,6 +18,8 @@ Report
 - Conclusion
 - Diskussion über Parameterinkonsistenz und Abhängigkeit davon ob der Code konvergiert oder nicht
 - streamline upwind diffusion beschreiben und motivieren
+- Regularisierungen beschreiben
+- numerische Vorgehensweise anpassen
 
 Theorie
 - andere Parametrisierungen von W_SSA?

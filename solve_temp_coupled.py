@@ -290,6 +290,7 @@ def solve_system(
         "k_rel":[],
         "saving_interval": saving_interval,
         "boundary_condition": str(print_bc),
+        "initial_condition": str(initial_conditions),
         "tau": tau.value
     }
     tmp["h_w"].append(h_w_old.x.array.copy())
@@ -435,10 +436,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 0.8, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.28, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("test6_crippa_tr", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
+initial_cond = {"h_w": -0.22, "phi": 0.468, "T_i": -5, "T_w": 0}
+solve_system("test6_crippa_uniformInfiltration", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
