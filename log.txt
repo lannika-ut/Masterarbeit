@@ -154,3 +154,7 @@ T_int auch nochmal geändert, obwohl ich glaub, dass das eigentlich das gleiche 
 korrigiertes W_SSA ist ca 100 - 350 1/m kleiner als vorheriges.
 Ich glaube die Parameterklasse stimmt jetzt.
 Vielleicht liegt das daran dass ich zu nass starte??? Ich glaub eigentlich nicht, aber na ja. Also ich finds nicht raus...
+
+21.07.2026 09:00 - Uhr
+Besprechung mit Anne:
+Ich glaub, dass es jetzt so degeneriert lag an der neuen Formulierung von W_SSA. Mit der alten Formulierung läuft es nämlich durch. Ich hab jetzt W_SSA = theta*... ausprobiert, das sieht auch bisschen besser aus, kriegt aber große Probleme, wenn es zu trocken wird, also macht der Regularisierungsterm wohl doch Sinn.

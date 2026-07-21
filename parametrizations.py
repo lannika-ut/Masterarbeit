@@ -212,11 +212,12 @@ class Parameter:
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area. """
         phi0 = 1 - self.rho_s/self.rho_i
-        S = self.saturation(Se, phi)
+        t = self.theta(Se, phi)
         wssa = ufl.conditional(
-            S >= self.S_l,
-            (S - self.S_l)*self.SSA_0/(phi0*ufl.ln(phi0))*phi*ufl.ln(phi),
-            0)
+            ufl.ge(t, self.theta_r),
+            t*self.SSA_0/(phi0*ufl.ln(phi0))*ufl.ln(phi),
+            0
+        )
         return wssa
 
     def S_e_numerical(self, h_w):
@@ -275,11 +276,10 @@ class Parameter:
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         phi_arr = np.array(phi.x.array)
-        S = self.saturation_numerical(Se, np.array(phi.x.array))
-        reg_term = np.clip((S - self.S_l.value), 0, None)
+        reg_term = np.clip(self.theta_numerical(Se, phi)-self.theta_r.value, 0, None)
         wssa = (reg_term*self.SSA_0.value
                 / (phi0*np.log(phi0))
-                * phi_arr * np.log(phi_arr))
+                * np.log(phi_arr))
         return wssa
 
     def calc_krel(self, hw, alpha, N, minhw):

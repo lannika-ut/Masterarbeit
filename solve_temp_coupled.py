@@ -27,7 +27,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
-    max_dt = 5
+    max_dt = 1
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -37,7 +37,7 @@ def solve_Richards(
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-11, max_it=50)
+    snes.setTolerances(rtol=1e-4, atol=1e-4, max_it=50)
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -122,7 +122,7 @@ def solve_system(
     nx = int(geom.length/delta_x)
     nz = int(geom.height/delta_x)
     print(f"Resolution is dx = dz = {delta_x} m, giving nx = {nx}, nz = {nz}")
-    domain = geom.make_domain(nx, nz)
+    domain = geom.make_domain(nx, nz, celltype=mesh.CellType.quadrilateral)
     tdim = domain.topology.dim
     V_hw = functionspace(domain, ("CG", 1))
     v_hw = TestFunction(V_hw)
@@ -135,7 +135,6 @@ def solve_system(
 
     # Parameters
     p = Parameter(domain, layer_params)
-    eps = 0.1 # °C that water (ice) can go lower (higher) than freezing temp
     # Time parameters
     delta_t = Constant(domain, PETSc.ScalarType(delta_t))
     t = 0
@@ -180,7 +179,7 @@ def solve_system(
     source_mass.name = "source_mass"
 
     # Weak formulation
-    tau = Constant(domain, PETSc.ScalarType(0.05))
+    tau = Constant(domain, PETSc.ScalarType(0.01))
     F_hw1 = (
         v_hw * (p.theta(p.S_e(h_w), phi1) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
@@ -237,12 +236,12 @@ def solve_system(
         if d["name"] == "Neumann":
             # update weak formulations with Neumann bc
             if d["variable"] == "h_w":
-                F_hw1 += -bcs[key]
-                F_hw2 += -bcs[key]
+                F_hw1 += bcs[key]
+                F_hw2 += bcs[key]
             elif d["variable"] == "T_i":
-                F_Ti += -bcs[key]
+                F_Ti += bcs[key]
             elif d["variable"] == "T_w":
-                F_Tw += -bcs[key]
+                F_Tw += bcs[key]
         elif d["name"] == "Dirichlet":
             # sort Dirichlet bc after variable
             if d["variable"] == "h_w":
@@ -264,7 +263,7 @@ def solve_system(
     J_hw2 = create_matrix(problem_hw2.a)
     # Set up linear solver options
     petsc_options = {
-        "ksp_error_if_not_converged": False,
+        "ksp_error_if_not_converged": True,
         "ksp_type": "gmres",
         "ksp_rtol": 1e-4,
         "ksp_atol": 1e-6,
@@ -291,6 +290,7 @@ def solve_system(
         "k_rel":[],
         "saving_interval": saving_interval,
         "boundary_condition": str(print_bc),
+        "tau": tau.value
     }
     tmp["h_w"].append(h_w_old.x.array.copy())
     tmp["phi"].append(phi_old.x.array.copy())
@@ -332,20 +332,14 @@ def solve_system(
         krel.x.array[:] = new_krel.x.array.copy()
         krel.x.scatter_forward()
 
-        # Debug
-        cell = 400
-        hwdg0 = Function(Q)
-        hwdg0.interpolate(h_w1)
-        t1 = p.D_i.value*p.W_SSA_numerical(p.S_e_numerical(hwdg0), phi1)[cell]/p.r_i.value
-        t2 = (1 - phi1.x.array[cell])/delta_t.value
-        print(f"D_i*W_SSA/r_i = {t1}")
-        print(f"(1-phi)/dt = {t2}")
-
+        #print("krel min/max:",
+        #np.min(krel.x.array),
+        #np.max(krel.x.array))
 
         # Solve Thermodynamics in Picard Loop
         T_i_h.x.array[:] = T_i_old.x.array
         T_w_h.x.array[:] = T_w_old.x.array
-        for k in range(1):
+        for k in range(5):
             Ti_old_picard = T_i_h.x.array.copy()
             Tw_old_picard = T_w_h.x.array.copy()
             problem_Tw = LinearProblem(
@@ -360,8 +354,8 @@ def solve_system(
             T_i_new = problem_Ti.solve()
             T_i_h.x.array[:] = T_i_new.x.array.copy()
             T_i_h.x.scatter_forward()
-            err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
-            err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
+            #err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
+            #err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
             #print(k, err_i, err_w)
             k += 1
         # Update temperatures
@@ -383,6 +377,13 @@ def solve_system(
             h_w, h_w_old, snes2, problem_hw2, b_hw2, J_hw2, delta_t, t, tmp, filename, phi, T_i_h, T_w_h)
         sol_vec.copy(h_w.x.petsc_vec)  # copy solution into h_w
         h_w.x.scatter_forward()
+
+        # Debug
+        #print("-----")
+        #print(np.max(np.abs(h_w1.x.array)))
+        #print(np.max(np.abs(phi1.x.array)))
+        #print(np.max(np.abs(T_i_h.x.array)))
+        #print(np.max(np.abs(T_w_h.x.array)))
 
         # save temporary data
         if t >= next_saving_time:
@@ -434,10 +435,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 1, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
-initial_cond = {"h_w": -0.2, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("test4_Crippa", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)
+initial_cond = {"h_w": -0.28, "phi": 0.468, "T_i": -5, "T_w": 0}
+solve_system("test6_crippa_tr", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)

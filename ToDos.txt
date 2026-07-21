@@ -2,10 +2,10 @@ To dos:
 Code
 - isotherm mit bulk temperature ausprobieren, falls alles nicht funktioniert
 - view_solutions flexibler machen
-- Anfangsbedingung Wasser: untersten 25 cm gesättigt, darüber hydrostatisch
 - ganz am Schluss: Code aufräumen, insb. function files.
 - zeitabhängige Randbedingungen einprogrammieren
 - Gewichte für T_int auch für geschichteten Fall einprogrammieren (in Parametrizations)
+- gekipptes Gebiet ausprobieren
 
 Report
 - finite Elemente richtig beschreiben
@@ -16,6 +16,7 @@ Report
 - Results & Discussion in einem: Beschreibung der Test Cases, Ergebnisse und Diskussion je Test Case in einem Kapitel, nicht in separaten Kapiteln
 - Conclusion
 - Diskussion über Parameterinkonsistenz und Abhängigkeit davon ob der Code konvergiert oder nicht
+- streamline upwind diffusion beschreiben und motivieren
 
 Theorie
 - andere Parametrisierungen von W_SSA?
