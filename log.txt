@@ -155,7 +155,10 @@ korrigiertes W_SSA ist ca 100 - 350 1/m kleiner als vorheriges.
 Ich glaube die Parameterklasse stimmt jetzt.
 Vielleicht liegt das daran dass ich zu nass starte??? Ich glaub eigentlich nicht, aber na ja. Also ich finds nicht raus...
 
-21.07.2026 09:00 - Uhr
+21.07.2026 09:00 - 15:00 Uhr
 Besprechung mit Anne:
 Ich glaub, dass es jetzt so degeneriert lag an der neuen Formulierung von W_SSA. Mit der alten Formulierung läuft es nämlich durch. Ich hab jetzt W_SSA = theta*... ausprobiert, das sieht auch bisschen besser aus, kriegt aber große Probleme, wenn es zu trocken wird, also macht der Regularisierungsterm wohl doch Sinn. Ok, ich regularisiere jetzt mit theta-theta_r und jetzt funktioniert es ahhhhhhhh geiloooooo.
 Vergleich Parameter: Gleicher Test Case wie bei Camilla, einmal mit ihren Parametern, einmal mit meinen etwas konsistenteren. Bei Camilla kann ich bis 0.8m Wassersäule als Randbedingung oben drauf packen und es konvergiert. Bei meinen konvergiert es erst wenn ich nur 0.1 m Wassersäule draufpack. Außerdem bleibt bei meinen Parametern die Eis- und Wassertemperatur kälter und die Porosität ändert sich viel, viel weniger. Und das Wasser infiltriert weniger schnell. Also man kann auf jeden Fall sagen, dass es mit Camillas Parametern besser funktioniert, aber halt nicht ganz so realistisch ist...
+
+22.07.2026 09:00 - 16:00 Uhr
+Vergleich was für ein Unterschied die Parameter machen. compare_cross_sections geschrieben und schon ziemlich viel im Report dazu geschrieben.

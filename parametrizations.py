@@ -25,16 +25,16 @@ class Parameter:
                         ...
                     }
         """
-        self.rho_i = fem.Constant(domain, PETSc.ScalarType(919))  # kg/m^3
+        self.rho_i = fem.Constant(domain, PETSc.ScalarType(917))  # kg/m^3
         self.rho_w = fem.Constant(domain, PETSc.ScalarType(1000))  # kg/m^3
-        self.mu_w = fem.Constant(domain, PETSc.ScalarType(1.792e-3))  # kg/(m*s)
+        self.mu_w = fem.Constant(domain, PETSc.ScalarType(1.7e-3))  # kg/(m*s)
         self.g = fem.Constant(domain, PETSc.ScalarType(9.81))  # m/s^2
 
         # Thermal properties
         self.c_pw = fem.Constant(domain, PETSc.ScalarType(4200))  # J/(kg*°C)
-        self.c_pi = fem.Constant(domain, PETSc.ScalarType(1960))  # J/(kg*°C)
-        self.K_i = fem.Constant(domain, PETSc.ScalarType(2.29))  # W/(m*°C)
-        self.K_w = fem.Constant(domain, PETSc.ScalarType(0.554))  # W/(m*°C)
+        self.c_pi = fem.Constant(domain, PETSc.ScalarType(2040))  # J/(kg*°C)
+        self.K_i = fem.Constant(domain, PETSc.ScalarType(2.2))  # W/(m*°C)
+        self.K_w = fem.Constant(domain, PETSc.ScalarType(0.55))  # W/(m*°C)
         self.T_melt = fem.Constant(domain, PETSc.ScalarType(0))  # °C
         self.L_sol = fem.Constant(domain, PETSc.ScalarType(3.34e5))  # J/kg
         self.beta_sol = fem.Constant(domain, PETSc.ScalarType(800))  # s/m
@@ -77,7 +77,7 @@ class Parameter:
             self.min_hw = fem.Constant(
                 domain, PETSc.ScalarType(self.calc_min_hw()))
 
-        self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
+        self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02)) # from Yamaguchi et al. 2010
         self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
 
     def _assign_material(self, domain):
@@ -179,7 +179,7 @@ class Parameter:
             1)
 
     def theta(self, Se, phi):
-        """Calculate the volumetric water content after van Genuchten."""
+        """Calculate the volumetric water content after van Genuchten. (theta_s = 0.9*phi from Yamaguchi et al. 2010)"""
         t = self.theta_r + (0.9*phi-self.theta_r)*Se
         return t
 

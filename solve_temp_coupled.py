@@ -442,4 +442,4 @@ bc_dict = {
 }
 
 initial_cond = {"h_w": -0.22, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("test6_crippa_uniformInfiltration_Crippaparams", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
+solve_system("test6_crippa_uniformInfiltration_realparams_nophiclip", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
