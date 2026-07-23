@@ -162,3 +162,6 @@ Vergleich Parameter: Gleicher Test Case wie bei Camilla, einmal mit ihren Parame
 
 22.07.2026 09:00 - 16:00 Uhr
 Vergleich was für ein Unterschied die Parameter machen. compare_cross_sections geschrieben und schon ziemlich viel im Report dazu geschrieben.
+
+23.07.2026 10:00 - 16:00 Uhr
+streamline diffusion und upwinding von krel beschrieben. Streamline diffusion nur noch in T_w.
