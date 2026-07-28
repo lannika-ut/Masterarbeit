@@ -1,5 +1,5 @@
 import numpy as np
-from parametrizations import Parameter
+from parametrizations_CrippaMoure import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
@@ -27,7 +27,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
-    max_dt = 1
+    max_dt = 0.025
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -179,7 +179,7 @@ def solve_system(
     source_mass.name = "source_mass"
 
     # Weak formulation
-    tau = Constant(domain, PETSc.ScalarType(0.05))
+    tau = Constant(domain, PETSc.ScalarType(0.1))
     F_hw1 = (
         v_hw * (p.theta(p.S_e(h_w), phi1) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
@@ -204,6 +204,7 @@ def solve_system(
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
         - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
         ((a_i-1)*T_i + a_w*T_w_h)/p.r_i * dx
+        #+ dot(grad(v_Ti), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
     )
     F_Tw = (
         v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
@@ -435,10 +436,10 @@ bc_dict = {
     "top_Tw": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": 0.8, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
 }
 
 initial_cond = {"h_w": -0.22, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("test6_uniformInfiltration_realparams_diffwater", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
+solve_system("Crippa_UniformInfiltration_dtsmall_taubig_onlyTw", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=20, saving_interval=0.2, delta_t=1e-2)

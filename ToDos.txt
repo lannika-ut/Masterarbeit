@@ -10,18 +10,10 @@ Code
 
 Report
 - finite Elemente richtig beschreiben
-- Diskussion über Parameterinkonsistenz und Abhängigkeit davon ob der Code konvergiert oder nicht
-- streamline upwind diffusion beschreiben und motivieren
 - Regularisierungen beschreiben
 - numerische Vorgehensweise anpassen
 - schauen, welche solver ich verwende und was genau die machen
-- upwinding ordentlich motivieren
 - Theory: Gleichungen, finite Elemente
 - Methods: numerische Implementierung (= Eigenleistung)
 - Results & Discussion in einem: Beschreibung der Test Cases, Ergebnisse und Diskussion je Test Case in einem Kapitel, nicht in separaten Kapiteln
 - Conclusion
-
-
-Theorie
-- andere Parametrisierungen von W_SSA?
-- andere Möglichkeiten den Code stabiler zu kriegen?

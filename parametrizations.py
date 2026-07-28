@@ -155,12 +155,8 @@ class Parameter:
                  }
         return _dict
 
-    def saturation(self, Se, phi):
-        """Calculate real saturation S=theta/phi"""
-        return (0.9 - self.theta_r/phi)*Se + self.theta_r/phi
-
     def calc_min_hw(self):
-        """Calculate min. pressure head such that saturation stays above 0.001."""
+        """Calculate min. pressure head such that S_e(h_w)>=Se_min."""
         minhw = (
             -(self.S_emin.value**(self.N.value/(1-self.N.value))
               - 1)**(1/self.N.value)/self.alpha.value)
@@ -197,7 +193,7 @@ class Parameter:
                 * ufl.exp(-0.013*self.rho_i*(1-phi))
                 * self.rho_w*self.g/self.mu_w)
 
-    def T_int(self, T_i, T_w, T_intold=None):
+    def T_int(self, T_i, T_w):
         """Calculate the interface temperature after Moure et al. (2023)."""
         # rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
         weights = [
@@ -243,11 +239,6 @@ class Parameter:
         t = (self.theta_r.value
              + (0.9*np.array(phi.x.array)-self.theta_r.value)*Se)
         return t
-    
-    def saturation_numerical(self, Se, phi):
-        """Numerical evaluation of the real saturation."""
-        S = (0.9 - self.theta_r.value/phi)*Se + self.theta_r.value/phi
-        return S
 
     def T_int_numerical(self, T_i, T_w):
         """Numerical evaluation of T_int (as opposed to the symbolic one)."""

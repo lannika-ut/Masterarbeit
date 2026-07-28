@@ -165,3 +165,7 @@ Vergleich was für ein Unterschied die Parameter machen. compare_cross_sections 
 
 23.07.2026 10:00 - 16:00 Uhr
 streamline diffusion und upwinding von krel beschrieben. Streamline diffusion nur noch in T_w.
+
+28.07.2026 09:00 - 14:00 Uhr
+Besprechung mit Anne: Vergleich Camillas zu meinen Daten. Camilla hat in der obersten Schicht eine Schicht mit geringere Porosität (also mehr Eis) als in unterer Schicht und sagt, dass das ist, weil da mehr Wasser ist, was gefrieren kann? Ich habe das nicht, teils eher das Gegenteil obwohl ich glaube, dass das bei mir leichte Oszillationen sind. Anne meint, ch soll mal schauen, ob ich das auch noch hinkriege, dass ich das so habe wie die Camilla. Ich hab das nur, wenn ich T_i und T_w streamline diffuse mit tau=0.1, was ziemlich hoch ist. Außerdem sammelt sich bei der Camilla unten Wasser an, was es bei mir nicht tut. Bei mir friert es dafür unten zu... Also die Modelle sind schon recht unterschiedlich, aber grob ähnlich würde ich sagen.
+Ich hab dann noch versucht die Regularisierungen zu beschreiben, konnte mich aber nicht konzentrieren und hab nichts aufs Blatt gebracht. Aber dafür hab ich die water retention curve für geclipptes und ungeclippetes hw geplottet. Mal schauen, ob ich das gebrauchen kann
