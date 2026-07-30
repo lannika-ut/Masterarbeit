@@ -1,5 +1,5 @@
 import numpy as np
-from parametrizations_CrippaMoure import Parameter
+from parametrizations import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
@@ -20,6 +20,7 @@ from ufl import (
     grad, dx, dot, outer,
     SpatialCoordinate, TestFunction, TrialFunction,
     rhs, lhs, system,
+    conditional, ge,
 )
 from petsc4py import PETSc
 import pickle
@@ -27,7 +28,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
-    max_dt = 0.025
+    max_dt = 1
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -37,7 +38,7 @@ def solve_Richards(
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-4, max_it=50)
+    snes.setTolerances(rtol=1e-4, atol=1e-7, max_it=50)
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -179,7 +180,7 @@ def solve_system(
     source_mass.name = "source_mass"
 
     # Weak formulation
-    tau = Constant(domain, PETSc.ScalarType(0.1))
+    tau = Constant(domain, PETSc.ScalarType(0.01))
     F_hw1 = (
         v_hw * (p.theta(p.S_e(h_w), phi1) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
@@ -204,7 +205,6 @@ def solve_system(
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
         - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
         ((a_i-1)*T_i + a_w*T_w_h)/p.r_i * dx
-        #+ dot(grad(v_Ti), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_i)) * dx # artificial diffusion
     )
     F_Tw = (
         v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
@@ -216,7 +216,7 @@ def solve_system(
     )
 
     # Boundary conditions
-    print_bc = bc_dict.copy()
+    print_bc = str(bc_dict)
     bc = BoundaryCondition(domain, boundaries)
     for key, d in bc_dict.items():
         if d["variable"] == "h_w":
@@ -250,6 +250,13 @@ def solve_system(
                 bc_D_Ti.append(bcs[key])
             elif d["variable"] == "T_w":
                 bc_D_Tw.append(bcs[key])
+        elif d["name"] == "seepage face":
+            # update weak formulations with seepage contribution
+            if d["variable"] == "h_w":
+                F_hw1 += (v_hw * p.K_s(phi1) / bcs[key]
+                          *conditional(ge(h_w, 0), h_w, 0) * bc.ds(d["marker"]))
+                F_hw2 += (v_hw * p.K_s(phi) / bcs[key]
+                          *conditional(ge(h_w, 0), h_w, 0) * bc.ds(d["marker"]))
     
     # Create solver structure
     snes1 = PETSc.SNES().create()
@@ -289,7 +296,7 @@ def solve_system(
         "times": [],
         "k_rel":[],
         "saving_interval": saving_interval,
-        "boundary_condition": str(print_bc),
+        "boundary_condition": print_bc,
         "initial_condition": str(initial_conditions),
         "tau": tau.value
     }
@@ -340,7 +347,10 @@ def solve_system(
         # Solve Thermodynamics in Picard Loop
         T_i_h.x.array[:] = T_i_old.x.array
         T_w_h.x.array[:] = T_w_old.x.array
-        for k in range(5):
+        err_i = 100
+        err_w = 100
+        k = 0
+        while k <= 5 and err_i > 1e-5:
             Ti_old_picard = T_i_h.x.array.copy()
             Tw_old_picard = T_w_h.x.array.copy()
             problem_Tw = LinearProblem(
@@ -355,8 +365,8 @@ def solve_system(
             T_i_new = problem_Ti.solve()
             T_i_h.x.array[:] = T_i_new.x.array.copy()
             T_i_h.x.scatter_forward()
-            #err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
-            #err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
+            err_i = np.max(abs(T_i_h.x.array - Ti_old_picard))
+            err_w = np.max(abs(T_w_h.x.array - Tw_old_picard))
             #print(k, err_i, err_w)
             k += 1
         # Update temperatures
@@ -422,24 +432,31 @@ def solve_system(
 
 
 
-# Test function
-height = 2
-length = 1
-geom = Geometry(height, length)
+# Define experiment
+delta_x = 0.05
+height = 1
+length = 2
+slope = -1/20 # 5 %
+geom = Geometry(height, length, slope)
+[P0, P1, P2, P3] = geom.corner_points
 boundaries = {
-    1: lambda x: np.logical_or(np.isclose(x[0], 0), np.isclose(x[0], length)), # lateral
-    2: lambda x: np.isclose(x[1], height), # top
-    3: lambda x: np.isclose(x[1], 0)} # bottom
+    1: lambda x: np.isclose(x[1], slope*x[0]+P3[1]), # top
+    2: lambda x: np.isclose(x[1], slope*x[0]+P0[1]), # bottom
+    3: lambda x: np.isclose(x[0], P0[0]), # left
+    4: lambda x: np.isclose(x[0], P1[0]) # right
+    } 
 bc_dict = {
     "top_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_i"},
+        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_i"},
     "top_Tw": {
-        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_w"},
+        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 2, "name": "Dirichlet", "value": 0.8, "variable": "h_w"},
+        "marker": 1, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 3, "name": "Dirichlet", "value": -5, "variable": "T_i"}
+        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
+    "right_hw": {
+        "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
-initial_cond = {"h_w": -0.22, "phi": 0.468, "T_i": -5, "T_w": 0}
-solve_system("Crippa_UniformInfiltration_dtsmall_taubig_onlyTw", geom, 0.05, boundaries, bc_dict, initial_cond, T_end=20, saving_interval=0.2, delta_t=1e-2)
+initial_cond = {"h_w": -0.22, "phi": 0.468, "T_i": -0.5, "T_w": 0}
+solve_system("Test1_Annika", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-2)

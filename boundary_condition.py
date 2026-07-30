@@ -51,19 +51,19 @@ class BoundaryCondition:
                 bc_dict = {
                 key: {
                     "marker": marks_boundary (int),
-                    "name": type_of_bc("Dirichlet" or "Neumann"),
+                    "name": type_of_bc("Dirichlet", "Neumann" or "seepage face"),
                     "value": boundary_value_or_function,
                     "functionspace": fem.functionspace,
                     "testfunction": ufl.TestFunction,
                     },
                     ...
                 }.
-
+                If the name is "seepage face" the value needs to be a characteristic length (thin saturated boundary layer).
         Raises:
-            TypeError: Boundary condition unknown (name neither Dirichlet nor Neumann).
+            TypeError: Boundary condition unknown (name neither Dirichlet, Neumann, seepage face).
 
         Returns:
-            dict: Dictionnary containing either the fem.dirichletbc or the integral over the Neumann boundary of the function*testfunction. {key: dirichlet_or_Neumann}. The key is the same as in bc_dict.
+            dict: Dictionnary containing either the fem.dirichletbc or the integral over the Neumann or seepage face boundary of the function*testfunction. {key: dirichlet_Neumann_or_seepageface}. The key is the same as in bc_dict.
         """
         bcs = {}
         for key, values in bc_dict.items():
@@ -81,8 +81,10 @@ class BoundaryCondition:
                     bc = fem.dirichletbc(u_D, dofsD, V)                
             elif values["name"] == "Neumann":
                 bc = values["testfunction"]*values["value"]*self.ds(marker)
+            elif values["name"] == "seepage face":
+                bc = values["value"]
             else:
                 raise ValueError(
-                    f"Unknown boundary condition, maybe you misspelled. Accepted are 'Dirichlet' and 'Neumann'. Got: {values['name']}")
+                    f"Unknown boundary condition, maybe you misspelled. Accepted are 'Dirichlet', 'Neumann' and 'seepage face'. Got: {values['name']}")
             bcs[key] = bc
         return bcs
