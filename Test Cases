@@ -2,4 +2,10 @@ Moure: mit DG1-Temperaturen, DG0-Porosität, CG1 Wasserdruck, Infiltration -1e-6
 
 Moure_test_temp: Wasser infiltriert endlich mit ner gescheiten Geschwindigkeit (weil Anfangsbedingung trocken genug), aber Eistemperatur geht immer noch super schnell auf 0°C.
 
-Test1_Annika: homogen, gekippt, seepage face Randbedingung rechts, links und unten no flow, oben Regen. Eistemperatur unten -0.5°C, oben 0°C, seitlich no flow, anfangs -0.5. Wassertemperatur unten, seitlich no flow, oben 0°C, anfangs 0°C überall.  
+Test1_Annika: homogen, gekippt (Steigung 5%), seepage face Randbedingung rechts, links und unten no flow, oben 0.1 m, anfangs h_w=-0.22m (Se=1%). Eistemperatur unten -0.5°C, oben 0°C, seitlich no flow, anfangs -0.5. Wassertemperatur unten, seitlich no flow, oben 0°C, anfangs 0°C überall. 
+
+Test2_Annika: gleich wie Test1, aber mit oben Regen -1e-6
+
+Test3_Annika: wie Test1, aber mit Steigung 10%.
+
+Test4_Annika: wie Test2, nur mit Steigung 10% und anfänglichem h_w=-0.18 (=12% Se)
