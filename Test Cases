@@ -9,3 +9,5 @@ Test2_Annika: gleich wie Test1, aber mit oben Regen -1e-6
 Test3_Annika: wie Test1, aber mit Steigung 10%.
 
 Test4_Annika: wie Test2, nur mit Steigung 10% und anfänglichem h_w=-0.18 (=12% Se)
+
+Test5_Annika: homogen, gekippt (Steigung 10%), seepage face rechts, links und unten no flow, oben Neumann -1e-5, anfangs h_w=-0.17m, Eistemp. -0.5°C unten und oben 0°C (Randbedingung), anfangs -0.5°C, Wasser überall 0°C anfänglich. 

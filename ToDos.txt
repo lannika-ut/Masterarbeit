@@ -1,6 +1,5 @@
 To dos:
 Code
-- unterschiedliche Parameter ausprobieren
 - Gewichte für T_int auch für geschichteten Fall einprogrammieren (in Parametrizations)
 - view_solutions flexibler machen
 - ganz am Schluss: Code aufräumen, insb. function files.

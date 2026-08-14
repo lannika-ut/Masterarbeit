@@ -1,4 +1,5 @@
 solutions/*.pkl
 solutions/debug/*.pkl
 solutions/VergleichParameter/*.pkl
+solutions/VergleichParameterNeu/*.pkl
 animations/*.mp4

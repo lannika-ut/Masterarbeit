@@ -28,7 +28,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
-    max_dt = 1
+    max_dt = 2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -38,7 +38,7 @@ def solve_Richards(
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-9, max_it=50)
+    snes.setTolerances(rtol=1e-4, atol=1e-9, max_it=50) # atol=1e-4 for Crippa
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -196,10 +196,10 @@ def solve_system(
     q1 = p.K_s(phi1)*krel*grad(x[1]+h_w1)
     eps = 10*np.finfo(np.float64).eps
     weights_sum = (p.c_pw/p.L_sol
-                   + p.beta_sol/(p.rho_w*p.L_sol*p.r_i)
-                   + p.beta_sol/(p.rho_w*p.L_sol*p.r_w))
-    a_i = (p.beta_sol/(p.rho_w*p.L_sol*p.r_i))/weights_sum
-    a_w = (p.beta_sol/(p.rho_w*p.L_sol*p.r_w))/weights_sum
+                   + p.beta_sol*p.K_i/(p.rho_w*p.L_sol*p.r_i)
+                   + p.beta_sol*p.K_w/(p.rho_w*p.L_sol*p.r_w))
+    a_i = (p.beta_sol*p.K_i/(p.rho_w*p.L_sol*p.r_i))/weights_sum
+    a_w = (p.beta_sol*p.K_w/(p.rho_w*p.L_sol*p.r_w))/weights_sum
     F_Ti = (
         v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
@@ -451,12 +451,12 @@ bc_dict = {
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 1, "name": "Neumann", "value": -1e-6, "variable": "h_w"},
+        "marker": 1, "name": "Neumann", "value": -1e-5, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
     "right_hw": {
         "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
-initial_cond = {"h_w": -0.18, "phi": 0.468, "T_i": -0.5, "T_w": 0}
-solve_system("Test4_Annika", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=5*60*60, saving_interval=30, delta_t=1e-2)
+initial_cond = {"h_w": -0.17, "phi": 0.468, "T_i": -0.5, "T_w": 0}
+solve_system("Test5_Annika_24h_rightTint", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
