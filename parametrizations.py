@@ -61,6 +61,8 @@ class Parameter:
             self.alpha = param_fct["alpha"]
             self.N = param_fct["N"]
             self.min_hw = param_fct["min_hw"]
+            self.a_i = param_fct["a_i"] # weight for T_int
+            self.a_w = param_fct["a_w"] # weight for T_int
             self.layer_params_dict = layer_params
         else:  # homogeneous snow
             self.is_layered = False
@@ -76,6 +78,16 @@ class Parameter:
             self.N = fem.Constant(domain, PETSc.ScalarType(n))
             self.min_hw = fem.Constant(
                 domain, PETSc.ScalarType(self.calc_min_hw()))
+            # T_int parameters
+            weights = [
+                self.c_pw.value/self.L_sol.value,
+                self.beta_sol.value*self.K_i.value/(self.rho_w.value*self.L_sol.value*self.r_i.value),
+                self.beta_sol.value*self.K_w.value/(self.rho_w.value*self.L_sol.value*self.r_w.value)
+                ]
+            self.a_i = fem.Constant(
+                domain, PETSc.ScalarType(weights[1]/np.sum(weights)))
+            self.a_w = fem.Constant(
+                domain, PETSc.ScalarType(weights[2]/np.sum(weights)))
 
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02)) # from Yamaguchi et al. 2010
         self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
@@ -98,6 +110,8 @@ class Parameter:
         r_i = fem.Function(Q)
         r_w = fem.Function(Q)
         minhw = fem.Function(Q)
+        a_i = fem.Function(Q)
+        a_w = fem.Function(Q)
 
         tdim = domain.topology.dim
         num_cells = domain.topology.index_map(tdim).size_local
@@ -111,6 +125,8 @@ class Parameter:
         ri_vals = np.zeros(num_cells)
         rw_vals = np.zeros(num_cells)
         minhw_vals = np.zeros(num_cells)
+        ai_vals = np.zeros(num_cells)
+        aw_vals = np.zeros(num_cells)
 
         for c, x in enumerate(midpoints):
             # Check in which layer the midpoint is and assign the corresponding parameters
@@ -127,6 +143,13 @@ class Parameter:
                     minhw_vals[c] = (
                         -(self.S_emin.value**(n_vals[c]/(1-n_vals[c])) - 1)
                         **(1/n_vals[c])/alpha_vals[c])
+                    weights = [
+                        self.c_pw.value/self.L_sol.value,
+                        self.beta_sol.value*self.K_i.value/(self.rho_w.value*self.L_sol.value*ri_vals[c]),
+                        self.beta_sol.value*self.K_w.value/(self.rho_w.value*self.L_sol.value*rw_vals[c])
+                                ]
+                    ai_vals[c] = weights[1]/np.sum(weights)
+                    aw_vals[c] = weights[2]/np.sum(weights)
 
         # Fill functions with right values
         alpha.x.array[:] = alpha_vals
@@ -136,6 +159,8 @@ class Parameter:
         r_i.x.array[:] = ri_vals
         r_w.x.array[:] = rw_vals
         minhw.x.array[:] = minhw_vals
+        a_i.x.array[:] = ai_vals
+        a_w.x.array[:] = aw_vals
 
         alpha.x.scatter_forward()
         N.x.scatter_forward()
@@ -144,6 +169,8 @@ class Parameter:
         r_i.x.scatter_forward()
         r_w.x.scatter_forward()
         minhw.x.scatter_forward()
+        a_i.x.scatter_forward()
+        a_w.x.scatter_forward()
         # arange into dict
         _dict = {"d_i": d_i,
                  "rho_s": rho_s,
@@ -152,6 +179,8 @@ class Parameter:
                  "r_i": r_i,
                  "r_w": r_w,
                  "min_hw": minhw,
+                 "a_i": a_i,
+                 "a_w": a_w,
                  }
         return _dict
 
@@ -188,7 +217,7 @@ class Parameter:
             1)
 
     def K_s(self, phi):
-        """Calculate the saturated hydraulic conductivity after Calonne."""
+        """Calculate the saturated hydraulic conductivity after Calonne (2012)."""
         return (3*(self.d_i/2)**2
                 * ufl.exp(-0.013*self.rho_i*(1-phi))
                 * self.rho_w*self.g/self.mu_w)
@@ -205,8 +234,10 @@ class Parameter:
         denominator = weights[0] + weights[1] + weights[2]
         return numerator/denominator
 
+    
+
     def W_SSA(self, Se, phi):
-        """Calculate the wet specific surface area. """
+        """Calculate the wet specific surface area after Koponen et al. (1997) and Moure et al. (2023)."""
         phi0 = 1 - self.rho_s/self.rho_i
         t = self.theta(Se, phi)
         wssa = ufl.conditional(
@@ -355,7 +386,7 @@ class Parameter:
     def make_into_dict(self):
         """Store attributes into dictionnary."""
         d = {}
-        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N", "min_hw"]
+        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N", "min_hw", "a_i", "a_w"]
         for key, value in vars(self).items():
             if self.is_layered and key in p_layers:
                 d[key] = value.x.array

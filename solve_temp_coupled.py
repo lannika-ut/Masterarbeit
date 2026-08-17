@@ -96,9 +96,13 @@ def validate_state(h_w, phi, T_i, T_w, label="State"):
     assert not np.any(np.isnan(T_i.x.array)), "NaN in T_i"
     assert not np.any(np.isnan(T_w.x.array)), "NaN in T_w"
 
-def apply_initial_condition(f, ini):
-    if callable(ini):
+def apply_initial_condition(f, ini, DG0_space=None):
+    if callable(ini) and DG0_space is None:
         f.interpolate(ini)
+    elif callable(ini) and DG0_space is not None:
+        helper = Function(DG0_space)
+        helper.interpolate(ini)
+        f.interpolate(helper)
     else:
         f.x.array[:] = ini*np.ones_like(f.x.array)
     return f
@@ -151,13 +155,13 @@ def solve_system(
     T_w_old.name = "T_w_old"
     for key, ini in initial_conditions.items():
         if key == "h_w":
-            h_w_old = apply_initial_condition(h_w_old, ini)
+            h_w_old = apply_initial_condition(h_w_old, ini, Q)
         elif key == "phi":
-            phi_old = apply_initial_condition(phi_old, ini)
+            phi_old = apply_initial_condition(phi_old, ini, Q)
         elif key == "T_i":
-            T_i_old = apply_initial_condition(T_i_old, ini)
+            T_i_old = apply_initial_condition(T_i_old, ini, Q)
         elif key == "T_w":
-            T_w_old = apply_initial_condition(T_w_old, ini)
+            T_w_old = apply_initial_condition(T_w_old, ini, Q)
     
     # Trial Functions
     h_w = Function(V_hw)
@@ -195,23 +199,18 @@ def solve_system(
     )
     q1 = p.K_s(phi1)*krel*grad(x[1]+h_w1)
     eps = 10*np.finfo(np.float64).eps
-    weights_sum = (p.c_pw/p.L_sol
-                   + p.beta_sol*p.K_i/(p.rho_w*p.L_sol*p.r_i)
-                   + p.beta_sol*p.K_w/(p.rho_w*p.L_sol*p.r_w))
-    a_i = (p.beta_sol*p.K_i/(p.rho_w*p.L_sol*p.r_i))/weights_sum
-    a_w = (p.beta_sol*p.K_w/(p.rho_w*p.L_sol*p.r_w))/weights_sum
     F_Ti = (
         v_Ti * (1-phi1)*(T_i - T_i_old)/delta_t * dx
         + dot(grad(v_Ti), p.D_i*(1-phi1)*grad(T_i)) * dx
         - v_Ti*p.D_i*p.W_SSA(p.S_e(h_w1), phi1) *
-        ((a_i-1)*T_i + a_w*T_w_h)/p.r_i * dx
+        ((p.a_i-1)*T_i + p.a_w*T_w_h)/p.r_i * dx
     )
     F_Tw = (
         v_Tw * p.theta(p.S_e(h_w1), phi1)*(T_w - T_w_old)/delta_t * dx
         + dot(grad(v_Tw), (p.D_w*p.theta(p.S_e(h_w1), phi1)*grad(T_w)
                         + p.K_s(phi1)*krel*grad(x[1]+h_w1)*T_w)) * dx
         - v_Tw*p.D_w*p.W_SSA(p.S_e(h_w1), phi1) *
-        (a_i*T_i_h + (a_w-1)*T_w)/p.r_w * dx
+        (p.a_i*T_i_h + (p.a_w-1)*T_w)/p.r_w * dx
         + dot(grad(v_Tw), tau/(dot(q1,q1)+eps)*outer(q1,q1)*grad(T_w)) * dx # artificial diffusion
     )
 
@@ -458,5 +457,15 @@ bc_dict = {
         "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
-initial_cond = {"h_w": -0.17, "phi": 0.468, "T_i": -0.5, "T_w": 0}
-solve_system("Test5_Annika_24h_rightTint", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
+layer_params = {
+    "top": {"d_i": 0.3e-3, "rho_s": 390,
+        "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
+    "bottom": {"d_i": 0.4e-3, "rho_s": 309,
+        "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
+}
+
+def ini_hw(x):
+    return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
+    
+initial_cond = {"h_w": ini_hw, "phi": 0.468, "T_i": -0.5, "T_w": 0}
+solve_system("Test6_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
