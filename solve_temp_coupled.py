@@ -432,7 +432,7 @@ def solve_system(
 
 
 # Define experiment
-delta_x = 0.05
+delta_x = 0.025
 height = 1
 length = 2
 slope = -1/10 # 10 %
@@ -468,4 +468,4 @@ def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
     
 initial_cond = {"h_w": ini_hw, "phi": 0.468, "T_i": -0.5, "T_w": 0}
-solve_system("Test6_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
+solve_system("Test6_Annika_24h_finemesh", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
