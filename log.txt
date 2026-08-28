@@ -188,3 +188,10 @@ Ich hab das jetzt mit T_int verbessert und es sieht zum Glück noch ähnlich aus
 
 17.08.2026 09:00 - 14:00 Uhr
 Heterogen einprogrammiert, aber es ist noch problematisch mit der Anfangsbedingung weil ich ja mit CG1 keine scharfe Grenze hinkriege, dass heißt, dass ich in der Mitte an der Grenze gerade noch einen super trockenen Streifen habe. Aber das Modell läuft netterweise trotzdem durch und ich bekomme auch lateral flow!!! Aber an der rechten unteren Seite passieren noch irgendwie komische Dinge, da gefriert das Eis irgendwie viel schneller und darüber staut sich Wasser an und dann ein bisschen später hab ich wieder das gleiche Problem dass sich in der zweituntersten Schicht viel Schmelzwasser bildet das sich dann aus irgendeinem Grund nach oben weiterverbreitet am linken Rand... Also da macht das Modell noch komische Sachen, aber ich hab auf jeden Fall lateralen Abfluss und den sieht man auch richtig gut! 
+
+18.08.2026 09:00 - 12:00 Uhr
+Besprechung mit anne: Stromlinien sollen von oben starten und wegen Oszillation soll ich mal schauen ob entweder ein feineres Gitter oder eine no-heat-flow Randbedingung am unteren Rand hilft. Finite Elemente soll ich so beschreiben, dass man versteht wie ich es implementiert hab aber muss sonst nicht so mega in die Tiefe gehen.
+Feineres Gitter hab ich mal ausprobiert, das hilft nichts, sieht genau gleich aus, nur eben feiner. 
+
+28.08.2026 10:00 - Uhr
+Rausgefunden wie man die Eistemperatur als Gradienten zwischen 0°C oben und -0.5°C unten starten lassen kann. Test7_Annika läuft damit plus no-heat-flow unten am Rand. Also mit no-heat-flow ist das Problem auf jeden Fall easy gelöst, dann geht nämlich direkt alles ins thermische Gleichgewicht über, das ist dann also sehr langweilig... aber es funktioniert super, man kriegt zuerst eine Schicht wo das Wasser lateral abfließt und dann fließt es am rechten Rand runter und staut sich dann unten auch noch auf.

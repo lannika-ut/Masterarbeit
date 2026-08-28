@@ -13,3 +13,5 @@ Test4_Annika: wie Test2, nur mit Steigung 10% und anfänglichem h_w=-0.18 (=12% 
 Test5_Annika: homogen, gekippt (Steigung 10%), seepage face rechts, links und unten no flow, oben Neumann -1e-5, anfangs h_w=-0.17m, Eistemp. -0.5°C unten und oben 0°C (Randbedingung), anfangs -0.5°C, Wasser überall 0°C anfänglich. 
 
 Test6_Annika: heterogen oben d_i = 0.3 mm, rho_s = 390 kg/m^3, unten d_i = 309 mm, rho_s = 309 kg/m^3, sonst wie Test5. Außer Anfangsbedingung h_w: oben h_w = -0.3 m, unten h_w = -0.2 m, damit ist S_e = 1 % überall ungefähr.
+
+Test7_Annika: wie Test 6, aber mit Anfangsbedingung Eistemperatur Gradient von -0.5°C auf 0°C von unten nach oben und no-flow Randbedingung für Eistemperatur unten.
