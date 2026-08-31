@@ -15,3 +15,7 @@ Test5_Annika: homogen, gekippt (Steigung 10%), seepage face rechts, links und un
 Test6_Annika: heterogen oben d_i = 0.3 mm, rho_s = 390 kg/m^3, unten d_i = 309 mm, rho_s = 309 kg/m^3, sonst wie Test5. Außer Anfangsbedingung h_w: oben h_w = -0.3 m, unten h_w = -0.2 m, damit ist S_e = 1 % überall ungefähr.
 
 Test7_Annika: wie Test 6, aber mit Anfangsbedingung Eistemperatur Gradient von -0.5°C auf 0°C von unten nach oben und no-flow Randbedingung für Eistemperatur unten.
+
+Test8_Annika: heterogen wie Test 6, gekippt 10%, Randbedingungen: kein Regen, no-flow hw oben, Ti=Tw=0°C oben, seitlich no-flow für Ti, Tw, links auch für hw, rechts seepage, unten Tw, hw no-flow, Ti=-0.5°C. Anfangsbedingung: Se = 50% überall ungefähr (oben hw=-0.225m, unten hw=-0.135m), phi=0.468, Tw=0°C, Tiunten -0.5°C bis oben 0°C Gradient.
+
+Test9_Annika: wie Test 8, aber mit seepage face für hw unten, oben regnet es drauf mit 1e-6 m/s

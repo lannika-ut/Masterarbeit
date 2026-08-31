@@ -193,5 +193,9 @@ Heterogen einprogrammiert, aber es ist noch problematisch mit der Anfangsbedingu
 Besprechung mit anne: Stromlinien sollen von oben starten und wegen Oszillation soll ich mal schauen ob entweder ein feineres Gitter oder eine no-heat-flow Randbedingung am unteren Rand hilft. Finite Elemente soll ich so beschreiben, dass man versteht wie ich es implementiert hab aber muss sonst nicht so mega in die Tiefe gehen.
 Feineres Gitter hab ich mal ausprobiert, das hilft nichts, sieht genau gleich aus, nur eben feiner. 
 
-28.08.2026 10:00 - Uhr
+28.08.2026 10:00 - 12:00 Uhr
 Rausgefunden wie man die Eistemperatur als Gradienten zwischen 0°C oben und -0.5°C unten starten lassen kann. Test7_Annika läuft damit plus no-heat-flow unten am Rand. Also mit no-heat-flow ist das Problem auf jeden Fall easy gelöst, dann geht nämlich direkt alles ins thermische Gleichgewicht über, das ist dann also sehr langweilig... aber es funktioniert super, man kriegt zuerst eine Schicht wo das Wasser lateral abfließt und dann fließt es am rechten Rand runter und staut sich dann unten auch noch auf.
+
+31.08.2026 10:00 - 15:40 Uhr
+Test ob man nur durch Zufrieren auch lateralen Abfluss bekommt, also Test8_Annika startet mit 50% Sättigung aber ohne Regen und hält unten die Eistemperatur auf -0.5°C. Und auch noch geschaut, ob evtl wenn man unten Wasser rausfließen lässt, es das auch will (Test9_Annika). Antwort ist ja, aber eher nur wenn man unten no-heat-flow macht, fand ich aber nicht so realistisch, deswegen ist Test9 jetzt mit unten fest -0.9°C und da friert es dann wieder zu.
+Sonst hab ich den Theorieteil fertig geschrieben.
