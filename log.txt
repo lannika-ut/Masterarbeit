@@ -199,3 +199,6 @@ Rausgefunden wie man die Eistemperatur als Gradienten zwischen 0°C oben und -0.
 31.08.2026 10:00 - 15:40 Uhr
 Test ob man nur durch Zufrieren auch lateralen Abfluss bekommt, also Test8_Annika startet mit 50% Sättigung aber ohne Regen und hält unten die Eistemperatur auf -0.5°C. Und auch noch geschaut, ob evtl wenn man unten Wasser rausfließen lässt, es das auch will (Test9_Annika). Antwort ist ja, aber eher nur wenn man unten no-heat-flow macht, fand ich aber nicht so realistisch, deswegen ist Test9 jetzt mit unten fest -0.9°C und da friert es dann wieder zu.
 Sonst hab ich den Theorieteil fertig geschrieben.
+
+01.09.2026 10:00 - 14:00 Uhr
+rumprobiert

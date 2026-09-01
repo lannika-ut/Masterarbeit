@@ -238,14 +238,22 @@ class Parameter:
 
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area after Koponen et al. (1997) and Moure et al. (2023)."""
-        phi0 = 1 - self.rho_s/self.rho_i
+        # phi0 = 1 - self.rho_s/self.rho_i
+        # t = self.theta(Se, phi)
+        # wssa = ufl.conditional(
+        #     ufl.ge(t, self.theta_r),
+        #     t*self.SSA_0/(phi0*ufl.ln(phi0))*ufl.ln(phi),
+        #     0
+        # )
+        # return wssa
+        condition_expr = ufl.ge(self.theta(Se, phi), self.theta_r)
+        phi0 = 1 - self.rho_s / self.rho_i
         t = self.theta(Se, phi)
-        wssa = ufl.conditional(
-            ufl.ge(t, self.theta_r),
-            t*self.SSA_0/(phi0*ufl.ln(phi0))*ufl.ln(phi),
+        return ufl.conditional(
+            condition_expr,
+            t * self.SSA_0 / (phi0 * ufl.ln(phi0)) * ufl.ln(phi),
             0
         )
-        return wssa
 
     def S_e_numerical(self, h_w):
         """Numerical evaluation of the effective saturation after van Genuchten."""
@@ -298,7 +306,7 @@ class Parameter:
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
         phi_arr = np.array(phi.x.array)
-        reg_term = np.clip(self.theta_numerical(Se, phi)-self.theta_r.value, 0, None)
+        reg_term = np.clip(self.theta_numerical(Se, phi) - self.theta_r.value, 0, None)
         wssa = (reg_term*self.SSA_0.value
                 / (phi0*np.log(phi0))
                 * np.log(phi_arr))

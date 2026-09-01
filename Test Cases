@@ -18,4 +18,6 @@ Test7_Annika: wie Test 6, aber mit Anfangsbedingung Eistemperatur Gradient von -
 
 Test8_Annika: heterogen wie Test 6, gekippt 10%, Randbedingungen: kein Regen, no-flow hw oben, Ti=Tw=0°C oben, seitlich no-flow für Ti, Tw, links auch für hw, rechts seepage, unten Tw, hw no-flow, Ti=-0.5°C. Anfangsbedingung: Se = 50% überall ungefähr (oben hw=-0.225m, unten hw=-0.135m), phi=0.468, Tw=0°C, Tiunten -0.5°C bis oben 0°C Gradient.
 
-Test9_Annika: wie Test 8, aber mit seepage face für hw unten, oben regnet es drauf mit 1e-6 m/s
+Test9_Annika: wie Test 8, aber mit seepage face für hw unten, oben regnet es drauf mit 1e-6 m/s evtl Anfangsbedingung -0.3 und -0.2 m wieder, nochmal nachschauen
+
+Test10_Annika: wie Test 9, aber Regen nur 1e-7 m/s und unten T_i=-0.2°C, 4 Tage lange Simulation, Anfangsbedingung -0.3m, -0.2m hw oben bzw unten
