@@ -201,4 +201,7 @@ Test ob man nur durch Zufrieren auch lateralen Abfluss bekommt, also Test8_Annik
 Sonst hab ich den Theorieteil fertig geschrieben.
 
 01.09.2026 10:00 - 14:00 Uhr
-rumprobiert
+rumprobiert das konsistente funktioniert bei meinen Sachen besser, nur bei Camilla nicht...
+
+08.09.2026 09:15 - Uhr
+Konsistente WSSA-Formulierung eingebaut, jetzt Tests damit durchlaufen lassen. To do: auch homogenen Fall testen und schauen, ob ich da immer noch auch lateralen Abfluss bekomme -> hab ich gemacht, aber ich glaub, dass das nicht ganz so passt, weil die Porosität in der untersten Schicht jetzt komische Sachen macht.

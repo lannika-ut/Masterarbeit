@@ -2,6 +2,8 @@ Moure: mit DG1-Temperaturen, DG0-Porosität, CG1 Wasserdruck, Infiltration -1e-6
 
 Moure_test_temp: Wasser infiltriert endlich mit ner gescheiten Geschwindigkeit (weil Anfangsbedingung trocken genug), aber Eistemperatur geht immer noch super schnell auf 0°C.
 
+ACHTUNG: HIER IST ALLES MIT INKONSISTENTER WSSA-FORMULIERUNG!!!
+
 Test1_Annika: homogen, gekippt (Steigung 5%), seepage face Randbedingung rechts, links und unten no flow, oben 0.1 m, anfangs h_w=-0.22m (Se=1%). Eistemperatur unten -0.5°C, oben 0°C, seitlich no flow, anfangs -0.5. Wassertemperatur unten, seitlich no flow, oben 0°C, anfangs 0°C überall. 
 
 Test2_Annika: gleich wie Test1, aber mit oben Regen -1e-6
@@ -20,4 +22,15 @@ Test8_Annika: heterogen wie Test 6, gekippt 10%, Randbedingungen: kein Regen, no
 
 Test9_Annika: wie Test 8, aber mit seepage face für hw unten, oben regnet es drauf mit 1e-6 m/s evtl Anfangsbedingung -0.3 und -0.2 m wieder, nochmal nachschauen
 
-Test10_Annika: wie Test 9, aber Regen nur 1e-7 m/s und unten T_i=-0.2°C, 4 Tage lange Simulation, Anfangsbedingung -0.3m, -0.2m hw oben bzw unten
+Test10_Annika: wie Test 9, aber Regen nur 1e-7 m/s und unten T_i=-0.2°C,  Anfangsbedingung -0.3m, -0.2m hw oben bzw unten
+Test10_Annika_24h1 ist mit konsistenter WSSA Formulierung in Parameterklasse.
+Test10_Annika_24h2 ist mit Anfangsbedingung -0.225m oben und -0.135m unten und konsistentem WSSA.
+Test10_Annika_3h3 ist wie 24h2 nur mit -0.5 °C für Ti unten.
+
+AB HIER IST ALLES MIT KONSISTENTER WSSA-FORMULIERUNG!
+
+Test11_Annika: Heterogenes Gebiet (oben d_i = 0.3 mm, rho_s = 390 kg/m^3, unten d_i = 309 mm, rho_s = 309 kg/m^3), gekippt mit 10%, 2m x 1m.
+Randbedingungen: oben: 1e-7m/s Regen, Ti=Tw=0°C, rechts: alles no-flow, links: seepage face für hw, Ti, Tw no-flow, unten: Tw no-flow, Ti=-0.5°C, hw seepage face.
+Anfangsbedingungen: Se=1% überall (oben hw=-0.3m, unten hw=-0.2m), Tw=0°C, Ti=Gradient von unten -0.5°C zu 0°C oben, phi=0.468.
+
+Test12_Annika: Homogen, wie Test11, aber Anfangsbedingung hw=-0.18m (Se = 12%).

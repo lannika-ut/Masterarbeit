@@ -68,11 +68,12 @@ def solve_Richards(
                 f"Solver failed to converge (reason {converged}) even at "
                 f"the minimum time step {min_dt} s, t={t/3600:.4f} h."
             )
-        new_dt = max(0.5*float(delta_t.value), min_dt)
-        print(f"Newton diverged (reason {converged}), halving dt to "
-              f"{new_dt:.3f} s and retrying t={t/3600:.4f} h.")
-        repeat_time_step = True
-        return sol_vec, repeat_time_step, new_dt
+        else:
+            new_dt = max(0.5*float(delta_t.value), min_dt)
+            print(f"Newton diverged (reason {converged}), halving dt to "
+                f"{new_dt:.3f} s and retrying t={t/3600:.4f} h.")
+            repeat_time_step = True
+            return sol_vec, repeat_time_step, new_dt
     # Converged, but check if it was "slow" and should shrink dt anyway
     if num_iter > 10 and float(delta_t.value) > min_dt:
         new_dt = max(0.5*float(delta_t.value), min_dt)
@@ -454,7 +455,7 @@ bc_dict = {
      "right_hw": {
          "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -0.2, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
     "bottom_hw": {
         "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
@@ -469,8 +470,8 @@ layer_params = {
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
     
-initial_cond = {"h_w": ini_hw,
+initial_cond = {"h_w": -0.18,
                 "phi": 0.468,
-                "T_i": lambda x: 0.2*height*(x[1] - slope*x[0]) - 0.2,
+                "T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
                 "T_w": 0}
-solve_system("Test10_Annika_1h1", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=1*60*60, saving_interval=10*60, delta_t=1e-2)
+solve_system("Test12_Annika_64h", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=64*60*60, saving_interval=30*60, delta_t=1e-2)

@@ -248,7 +248,7 @@ class Parameter:
         # return wssa
         condition_expr = ufl.ge(self.theta(Se, phi), self.theta_r)
         phi0 = 1 - self.rho_s / self.rho_i
-        t = self.theta(Se, phi)
+        t = self.theta(Se, phi)-self.theta_r
         return ufl.conditional(
             condition_expr,
             t * self.SSA_0 / (phi0 * ufl.ln(phi0)) * ufl.ln(phi),
