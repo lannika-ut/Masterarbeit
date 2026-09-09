@@ -203,5 +203,8 @@ Sonst hab ich den Theorieteil fertig geschrieben.
 01.09.2026 10:00 - 14:00 Uhr
 rumprobiert das konsistente funktioniert bei meinen Sachen besser, nur bei Camilla nicht...
 
-08.09.2026 09:15 - Uhr
+08.09.2026 09:15 - 16:00 Uhr
 Konsistente WSSA-Formulierung eingebaut, jetzt Tests damit durchlaufen lassen. To do: auch homogenen Fall testen und schauen, ob ich da immer noch auch lateralen Abfluss bekomme -> hab ich gemacht, aber ich glaub, dass das nicht ganz so passt, weil die Porosität in der untersten Schicht jetzt komische Sachen macht.
+
+09.09.2026 10:00 - Uhr
+Versucht, Camillas Experiment nachzubauen, das klappt jetzt mit Camillas Parametern nur für hw=0.4m oben (bei Camilla hw=1m). Der Parametervergleich klappt grad noch gar nicht gut, das ist wirklich einfach zu extrem... Mal schauen, ob ich noch einen sinnvollen Vergleichsfall hinbekomme. Hab noch einen hinbekommen, der ist jetzt unter Test2_Camilla zu finden, ich musste die Eistemperatur unten auf -2°C kappen und oben nur 10cm Wassersäule drauf. Dann hab ich noch technische Details der solver im Anhang aufgeschrieben

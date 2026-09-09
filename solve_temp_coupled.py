@@ -28,7 +28,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-2
-    max_dt = 2
+    max_dt = 1e-2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -434,9 +434,9 @@ def solve_system(
 
 # Define experiment
 delta_x = 0.05
-height = 1
-length = 2
-slope = -1/10 # 10 %
+height = 2
+length = 1
+slope = 0 # 10 %
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
 boundaries = {
@@ -451,13 +451,13 @@ bc_dict = {
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
-     "right_hw": {
-         "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
+        "marker": 1, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
+    #  "right_hw": {
+    #      "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
-    "bottom_hw": {
-        "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
+        "marker": 2, "name": "Dirichlet", "value": -2, "variable": "T_i"},
+    # "bottom_hw": {
+    #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
 layer_params = {
@@ -470,8 +470,9 @@ layer_params = {
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
     
-initial_cond = {"h_w": -0.18,
+initial_cond = {"h_w": -0.22,
                 "phi": 0.468,
-                "T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
+                #"T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
+                "T_i": -2,
                 "T_w": 0}
-solve_system("Test12_Annika_64h", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=64*60*60, saving_interval=30*60, delta_t=1e-2)
+solve_system("Test2_Camilla_Camillaparams", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)

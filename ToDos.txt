@@ -1,6 +1,5 @@
 To dos:
 Code
-- view_solutions flexibler machen
 - ganz am Schluss: Code aufräumen, insb. function files.
 
 
