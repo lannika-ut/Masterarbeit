@@ -208,3 +208,8 @@ Konsistente WSSA-Formulierung eingebaut, jetzt Tests damit durchlaufen lassen. T
 
 09.09.2026 10:00 - Uhr
 Versucht, Camillas Experiment nachzubauen, das klappt jetzt mit Camillas Parametern nur für hw=0.4m oben (bei Camilla hw=1m). Der Parametervergleich klappt grad noch gar nicht gut, das ist wirklich einfach zu extrem... Mal schauen, ob ich noch einen sinnvollen Vergleichsfall hinbekomme. Hab noch einen hinbekommen, der ist jetzt unter Test2_Camilla zu finden, ich musste die Eistemperatur unten auf -2°C kappen und oben nur 10cm Wassersäule drauf. Dann hab ich noch technische Details der solver im Anhang aufgeschrieben
+
+
+10.09.2026 09:00 - 16:00 Uhr
+Besprechung mit Anne: ich soll versuchen, ob es klappt, wenn ich statt theta_r = 0.02, theta_r = 10^{-3}*phi nehme so wie in Moure et al. 
+Klappt, hab jetzt genau Camillas Testfall nachbauen können allerdings mit feinerer Auflösung (2cm statt 5cm). Hab dann auch nochmal den Parametervergleich neu geschrieben und da jetzt statt hw initial gleich zu lassen, direkt die Sättigung gleich gelassen, dann konvergiert es nämlich auch mit Camillas Testfall.

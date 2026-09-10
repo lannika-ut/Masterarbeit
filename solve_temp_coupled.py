@@ -1,5 +1,5 @@
 import numpy as np
-from parametrizations import Parameter
+from parametrizations_adapted_reswater import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
@@ -38,7 +38,7 @@ def solve_Richards(
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-9, max_it=50) # atol=1e-4 for Crippa sonst 1e-9
+    snes.setTolerances(rtol=1e-4, atol=1e-4, max_it=50) # atol=1e-4 for Crippa sonst 1e-9
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -433,7 +433,7 @@ def solve_system(
 
 
 # Define experiment
-delta_x = 0.05
+delta_x = 0.02
 height = 2
 length = 1
 slope = 0 # 10 %
@@ -451,11 +451,11 @@ bc_dict = {
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 1, "name": "Dirichlet", "value": 0.1, "variable": "h_w"},
+        "marker": 1, "name": "Dirichlet", "value": 1, "variable": "h_w"},
     #  "right_hw": {
     #      "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -2, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": -5, "variable": "T_i"},
     # "bottom_hw": {
     #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
@@ -470,9 +470,9 @@ layer_params = {
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
     
-initial_cond = {"h_w": -0.22,
+initial_cond = {"h_w": -0.171,
                 "phi": 0.468,
                 #"T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": -2,
+                "T_i": -5,
                 "T_w": 0}
-solve_system("Test2_Camilla_Camillaparams", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
+solve_system("Test2_Camilla_adaptedthetar_myparams", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
