@@ -1,5 +1,5 @@
 import numpy as np
-from parametrizations_adapted_reswater import Parameter
+from parametrizations_CrippaMoure_adapted import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
@@ -27,8 +27,8 @@ import pickle
 
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
-    min_dt = 1e-2
-    max_dt = 1e-2
+    min_dt = 1e-3
+    max_dt = 2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -38,7 +38,7 @@ def solve_Richards(
     # Set options
     snes.setType("newtonls")
     snes.getLineSearch().setType(PETSc.SNESLineSearch.Type.BT)
-    snes.setTolerances(rtol=1e-4, atol=1e-4, max_it=50) # atol=1e-4 for Crippa sonst 1e-9
+    snes.setTolerances(rtol=1e-4, atol=1e-9, max_it=50) # atol=1e-4 for Crippa sonst 1e-9
     ksp = snes.getKSP()
     ksp.setType("gmres")  # iterative solver
     ksp.setTolerances(rtol=1e-4)
@@ -391,7 +391,7 @@ def solve_system(
 
         # Debug
         #print("-----")
-        #print(np.max(np.abs(h_w1.x.array)))
+        print(np.max(np.abs(h_w1.x.array)))
         #print(np.max(np.abs(phi1.x.array)))
         #print(np.max(np.abs(T_i_h.x.array)))
         #print(np.max(np.abs(T_w_h.x.array)))
@@ -433,9 +433,9 @@ def solve_system(
 
 
 # Define experiment
-delta_x = 0.02
+delta_x = 0.0025
 height = 2
-length = 1
+length = delta_x
 slope = 0 # 10 %
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -451,28 +451,35 @@ bc_dict = {
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 1, "name": "Dirichlet", "value": 1, "variable": "h_w"},
+        "marker": 1, "name": "Neumann", "value": -1e-6, "variable": "h_w"},
     #  "right_hw": {
     #      "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
         "marker": 2, "name": "Dirichlet", "value": -5, "variable": "T_i"},
-    # "bottom_hw": {
-    #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
+    "bottom_hw": {
+        "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
+# layer_params = {
+#     "top": {"d_i": 0.3e-3, "rho_s": 390,
+#         "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
+#     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
+#         "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
+# }
 layer_params = {
-    "top": {"d_i": 0.3e-3, "rho_s": 390,
-        "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
-    "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-        "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
-}
+    "all": {"d_i": 1.5e-3, "rho_s": 501,
+        "locator": lambda x: x[1] == x[1]},
+        }
 
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
+
     
-initial_cond = {"h_w": -0.171,
+initial_cond = {"h_w": -0.14,
                 "phi": 0.468,
                 #"T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
                 "T_i": -5,
                 "T_w": 0}
-solve_system("Test2_Camilla_adaptedthetar_myparams", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=2*60, saving_interval=1, delta_t=1e-2)
+solve_system("Test43_Moure_ti-5", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=4*60*60, saving_interval=60, delta_t=1e-2)
+
+# Richtige Parametrisierung gewählt?

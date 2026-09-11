@@ -34,3 +34,7 @@ Randbedingungen: oben: 1e-7m/s Regen, Ti=Tw=0°C, rechts: alles no-flow, links: 
 Anfangsbedingungen: Se=1% überall (oben hw=-0.3m, unten hw=-0.2m), Tw=0°C, Ti=Gradient von unten -0.5°C zu 0°C oben, phi=0.468.
 
 Test12_Annika: Homogen, wie Test11, aber Anfangsbedingung hw=-0.18m (Se = 12%).
+
+AB HIER IST ALLES MIT ANGEPASSTEM RESIDUALWASSERGEHALT!
+
+Test13_Annika: wie Test11, nur mit no-flow für hw unten.
