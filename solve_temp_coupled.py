@@ -451,11 +451,11 @@ bc_dict = {
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
-        "marker": 1, "name": "Neumann", "value": -1e-6, "variable": "h_w"},
+        "marker": 1, "name": "Neumann", "value": -1e-5, "variable": "h_w"},
     #  "right_hw": {
     #      "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -5, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": -10, "variable": "T_i"},
     "bottom_hw": {
         "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
@@ -475,11 +475,11 @@ def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
 
     
-initial_cond = {"h_w": -0.14,
-                "phi": 0.468,
+initial_cond = {"h_w": -0.175,
+                "phi": 0.46,
                 #"T_i": lambda x: 0.5*height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": -5,
+                "T_i": -10,
                 "T_w": 0}
-solve_system("Test43_Moure_ti-5", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=4*60*60, saving_interval=60, delta_t=1e-2)
+solve_system("Test43_Moure", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=4*60*60, saving_interval=60, delta_t=1e-2)
 
 # Richtige Parametrisierung gewählt?
