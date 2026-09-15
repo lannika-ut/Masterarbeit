@@ -1,12 +1,16 @@
 To dos:
 Code
+- SSA0 für versch. layer einprogrammieren?
 - ganz am Schluss: Code aufräumen, insb. function files.
+- einen ordentlichen Ordner auf github hochladen mit allem Code der nötig ist um das Modell laufen zu lassen und dann auch noch vllt view_solutions_nonisothermal zur Auswertung, außerdem auch noch Bild vom Aufbau hochladen
 
 
 Report
-- numerische Vorgehensweise anpassen
-- schauen, welche solver ich verwende und was genau die machen
+- Introduction: state  of the art auch erwähnen dass Parametrisierung mit ungültigen Dichte Bereichen für Yamaguchi Parametrisierung..., Page 1 Figure einfügen
 - Theory: Gleichungen, finite Elemente
 - Methods: numerische Implementierung (= Eigenleistung)
-- Results & Discussion in einem: Beschreibung der Test Cases, Ergebnisse und Diskussion je Test Case in einem Kapitel, nicht in separaten Kapiteln
-- Conclusion
+- Testfälle beschreiben das soll nicht in Ergebnisteil
+- Results & Discussion in einem: Ergebnisse und Diskussion je Test Case in einem Abschnitt, am Ende falls noch was zum diskutieren ist, in einen allgemeinen Diskussionsteil (z.B. welche Annahmen wirklich wichtig sind oder so)
+- Conclusion: Zusammenfassung der wichtigsten Ergebnisse und Diskussionsteile, outlook, was kann das Modell (noch) nicht, was sollte es noch können, wo kann man weiterarbeiten, wie kann man es besser validieren usw.
+- Eigenständigkeitserklärung
+
