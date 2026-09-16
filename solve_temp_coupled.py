@@ -434,7 +434,7 @@ def solve_system(
 
 # Define experiment
 delta_x = 0.02
-height = 1
+height = 0.5
 length = 2
 slope = -1/10 # 10 %
 geom = Geometry(height, length, slope)
@@ -475,6 +475,6 @@ initial_cond = {"h_w": -0.18,
                 "phi": 0.468,
                 "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
                 "T_w": 0}
-solve_system("Test14_Annika", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
+solve_system("Test14_Annika_wetter", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=12*60*60, saving_interval=30*60, delta_t=1e-2)
 
 # Richtige Parametrisierung gewählt?

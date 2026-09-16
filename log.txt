@@ -222,7 +222,11 @@ Also ich hab jetzt weniger Wasser draufregnen lassen und nässere Anfangsbedingu
 14.09.2026 09:30 - 16:30 Uhr
 Validierung mit isothermischen Experimentdaten (also die hab ich bis jetzt nur aus dem Plot rausgelesen, bzw chatgpt) von Avanzi (2016). Das klappt wirklich gut. Also es passt bis zum interface, danach sagen die auch im Paper, dass halt preferential flow paths danach ziemlich wichtig werden, weswegen mein Modell erst nach längere Zeit was durch die Schichtgrenze lässt. Aber bis zur Schichtgrenze passt es eigentlich ganz gut. Ich hab es auch nur so lange laufen lassen, wie die das Experiment laufen lassen haben. Dafür passen die Daten auch super.
 
-15.09.2026 09:00 - Uhr
+15.09.2026 09:00 - 15:30 Uhr
 Besprechung mit Anne: siehe to dos
 streamlines in Animation eingefügt, das sieht jetzt sehr schick aus hehe. Außerdem homogenen Test gestartet.
 Richtige Werte für Avanzi einprogrammiert. Angefangen test cases description zu schreiben.
+
+16.09.2026 10:00 - 17:00 Uhr
+Homogenen Fall getestet, ist bisschen schwierig, habs jetzt bisschen kleiner gemacht und nasser, jetzt gehts circa, aber bin mir nicht sicher, ob der Cirpka das dann so gut findet weil es schon ein bisschen so aussieht als ob die Porosität oszillieren würde und sich deswegen da der laterale Abfluss bildet...
+Sonst hab ich die Testfälle beschrieben und Kelvin in °C geändert.
