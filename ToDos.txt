@@ -7,7 +7,7 @@ Code
 
 Report
 - Introduction: state  of the art auch erwähnen dass Parametrisierung mit ungültigen Dichte Bereichen für Yamaguchi Parametrisierung..., Page 1 Figure einfügen
-- Theory: Gleichungen, finite Elemente -> noch alles von Kelvin in °C umwandeln
+- Theory: Gleichungen, finite Elemente
 - Methods: numerische Implementierung (= Eigenleistung)
 - Testfälle beschreiben das soll nicht in Ergebnisteil
 - Results & Discussion in einem: Ergebnisse und Diskussion je Test Case in einem Abschnitt, am Ende falls noch was zum diskutieren ist, in einen allgemeinen Diskussionsteil (z.B. welche Annahmen wirklich wichtig sind oder so)

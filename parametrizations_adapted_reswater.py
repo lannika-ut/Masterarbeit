@@ -48,8 +48,10 @@ class Parameter:
         self.D_w = fem.Constant(domain, PETSc.ScalarType(Dw))  # m^2/s
 
         self.layer_params_dict = layer_params
-        self.S_emin = fem.Constant(domain, PETSc.ScalarType(1e-6)) # minimum effective saturation
-        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3)) # residual saturation
+        # minimum effective saturation
+        self.S_emin = fem.Constant(domain, PETSc.ScalarType(1e-6))
+        # residual saturation
+        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3))
         # snow/van Genuchten parameters
         if layer_params is not None:
             self.is_layered = True
@@ -61,8 +63,9 @@ class Parameter:
             self.alpha = param_fct["alpha"]
             self.N = param_fct["N"]
             self.min_hw = param_fct["min_hw"]
-            self.a_i = param_fct["a_i"] # weight for T_int
-            self.a_w = param_fct["a_w"] # weight for T_int
+            self.a_i = param_fct["a_i"]  # weight for T_int
+            self.a_w = param_fct["a_w"]  # weight for T_int
+            self.SSA_0 = param_fct["SSA_0"]  # 1/m
             self.layer_params_dict = layer_params
         else:  # homogeneous snow
             self.is_layered = False
@@ -81,17 +84,21 @@ class Parameter:
             # T_int parameters
             weights = [
                 self.c_pw.value/self.L_sol.value,
-                self.beta_sol.value*self.K_i.value/(self.rho_w.value*self.L_sol.value*self.r_i.value),
-                self.beta_sol.value*self.K_w.value/(self.rho_w.value*self.L_sol.value*self.r_w.value)
-                ]
+                self.beta_sol.value*self.K_i.value /
+                (self.rho_w.value*self.L_sol.value*self.r_i.value),
+                self.beta_sol.value*self.K_w.value /
+                (self.rho_w.value*self.L_sol.value*self.r_w.value)
+            ]
             self.a_i = fem.Constant(
                 domain, PETSc.ScalarType(weights[1]/np.sum(weights)))
             self.a_w = fem.Constant(
                 domain, PETSc.ScalarType(weights[2]/np.sum(weights)))
+            self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
 
-        self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02)) # from Yamaguchi et al. 2010
-        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3)) # like in Moure et al. (2023)
-        self.SSA_0 = fem.Constant(domain, PETSc.ScalarType(4114))  # 1/m
+        # from Yamaguchi et al. 2010
+        self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
+        # like in Moure et al. (2023)
+        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3))
 
     def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
@@ -100,7 +107,7 @@ class Parameter:
             domain (dolfinx.mesh.Mesh): FEM domain
             layer_params (dict): Dictionnary containing the snow parameters rho_s (density of snow) and the ice grain diameter d_i. It also contains a boolean function to locate the layer within the domain named locator.
         Returns:
-            dict: dictionnary of the parameter functions of d_i, rho_s, r_i=0.06*d_i, r_w=1.35*d_i and van Genuchten parameters alpha, N using the parametrization from Yamaguchi et al. (2012).
+            dict: dictionnary of the parameter functions of d_i, rho_s, r_i=0.06*d_i, r_w=1.35*d_i and van Genuchten parameters alpha, N using the parametrization from Yamaguchi et al. (2012), parametrization of SSA_0 is from Domine et al. (2007).
         """
         Q = fem.functionspace(domain, ("DG", 0))
         # create parameter functions
@@ -113,6 +120,7 @@ class Parameter:
         minhw = fem.Function(Q)
         a_i = fem.Function(Q)
         a_w = fem.Function(Q)
+        SSA0 = fem.Function(Q)
 
         tdim = domain.topology.dim
         num_cells = domain.topology.index_map(tdim).size_local
@@ -128,6 +136,7 @@ class Parameter:
         minhw_vals = np.zeros(num_cells)
         ai_vals = np.zeros(num_cells)
         aw_vals = np.zeros(num_cells)
+        SSA0_vals = np.zeros(num_cells)
 
         for c, x in enumerate(midpoints):
             # Check in which layer the midpoint is and assign the corresponding parameters
@@ -143,14 +152,19 @@ class Parameter:
                     rw_vals[c] = 1.35*ri_vals[c]
                     minhw_vals[c] = (
                         -(self.S_emin.value**(n_vals[c]/(1-n_vals[c])) - 1)
-                        **(1/n_vals[c])/alpha_vals[c])
+                        ** (1/n_vals[c])/alpha_vals[c])
                     weights = [
                         self.c_pw.value/self.L_sol.value,
-                        self.beta_sol.value*self.K_i.value/(self.rho_w.value*self.L_sol.value*ri_vals[c]),
-                        self.beta_sol.value*self.K_w.value/(self.rho_w.value*self.L_sol.value*rw_vals[c])
-                                ]
+                        self.beta_sol.value*self.K_i.value /
+                        (self.rho_w.value*self.L_sol.value*ri_vals[c]),
+                        self.beta_sol.value*self.K_w.value /
+                        (self.rho_w.value*self.L_sol.value*rw_vals[c])
+                    ]
                     ai_vals[c] = weights[1]/np.sum(weights)
                     aw_vals[c] = weights[2]/np.sum(weights)
+                    SSA0_vals[c] = (
+                        value["rho_s"]*(
+                            -30.82*np.log(value["rho_s"]*1e-3) - 20.6))
 
         # Fill functions with right values
         alpha.x.array[:] = alpha_vals
@@ -162,6 +176,7 @@ class Parameter:
         minhw.x.array[:] = minhw_vals
         a_i.x.array[:] = ai_vals
         a_w.x.array[:] = aw_vals
+        SSA0.x.array[:] = SSA0_vals
 
         alpha.x.scatter_forward()
         N.x.scatter_forward()
@@ -172,6 +187,7 @@ class Parameter:
         minhw.x.scatter_forward()
         a_i.x.scatter_forward()
         a_w.x.scatter_forward()
+        SSA0.x.scatter_forward()
         # arange into dict
         _dict = {"d_i": d_i,
                  "rho_s": rho_s,
@@ -182,6 +198,7 @@ class Parameter:
                  "min_hw": minhw,
                  "a_i": a_i,
                  "a_w": a_w,
+                 "SSA_0": SSA0,
                  }
         return _dict
 
@@ -230,12 +247,10 @@ class Parameter:
             self.c_pw/self.L_sol,
             self.beta_sol*self.K_i/(self.rho_w*self.L_sol*self.r_i),
             self.beta_sol*self.K_w/(self.rho_w*self.L_sol*self.r_w)
-            ]
+        ]
         numerator = weights[0]*self.T_melt + weights[1]*T_i + weights[2]*T_w
         denominator = weights[0] + weights[1] + weights[2]
         return numerator/denominator
-
-    
 
     def W_SSA(self, Se, phi):
         """Calculate the wet specific surface area after Koponen et al. (1997) and Moure et al. (2023)."""
@@ -259,7 +274,7 @@ class Parameter:
             hw_safe = np.clip(hw, self.min_hw.x.array, -1e-8)
             Se[hw < -1e-8] = ((1 + (-a[hw < -1e-8]*hw_safe[hw < -1e-8])
                                ** n[hw < -1e-8])
-                               ** ((1-n[hw < -1e-8])/n[hw < -1e-8]))
+                              ** ((1-n[hw < -1e-8])/n[hw < -1e-8]))
         else:
             a = self.alpha.value
             n = self.N.value
@@ -287,10 +302,10 @@ class Parameter:
             self.c_pw.value/self.L_sol.value,
             self.beta_sol.value*self.K_i.value/(rho*self.L_sol.value*ri),
             self.beta_sol.value*self.K_w.value/(rho*self.L_sol.value*rw)
-            ]
+        ]
         numerator = (weights[0]*self.T_melt.value
                      + weights[1]*np.array(T_i.x.array)
-                     + weights[2]*np.array(T_w.x.array))                     
+                     + weights[2]*np.array(T_w.x.array))
         denominator = (weights[0] + weights[1] + weights[2])
         return numerator/denominator
 
@@ -298,12 +313,14 @@ class Parameter:
         """Numerical evaluation of the wet specific surface area."""
         if self.is_layered:
             phi0 = 1 - np.array(self.rho_s.x.array)/self.rho_i.value
+            ssa0 = np.array(self.SSA_0.x.array)
         else:
             phi0 = 1 - self.rho_s.value/self.rho_i.value
+            ssa0 = self.SSA_0.value
         phi_arr = np.array(phi.x.array)
         reg_term = np.clip(
             self.theta_numerical(Se, phi) - self.S_l.value*phi_arr, 0, None)
-        wssa = (reg_term*self.SSA_0.value
+        wssa = (reg_term*ssa0
                 / (phi0*np.log(phi0))
                 * np.log(phi_arr))
         return wssa
@@ -348,7 +365,8 @@ class Parameter:
         for cell in cells:
             node_index = c2v.links(cell)
             node_coords = domain.geometry.x[node_index]
-            h_tot = hw.x.array[node_index] + node_coords[:, 1]  # h_tot = hw + z
+            h_tot = hw.x.array[node_index] + \
+                node_coords[:, 1]  # h_tot = hw + z
             max_hw = hw.x.array[node_index[np.argmax(h_tot)]]
             if self.is_layered:
                 alpha = self.alpha.x.array[cell]
@@ -390,7 +408,8 @@ class Parameter:
     def make_into_dict(self):
         """Store attributes into dictionnary."""
         d = {}
-        p_layers = ["d_i", "rho_s", "r_i", "r_w", "alpha", "N", "min_hw", "a_i", "a_w"]
+        p_layers = ["d_i", "rho_s", "r_i", "r_w",
+                    "alpha", "N", "min_hw", "a_i", "a_w", "SSA_0"]
         for key, value in vars(self).items():
             if self.is_layered and key in p_layers:
                 d[key] = value.x.array

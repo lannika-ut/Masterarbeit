@@ -30,7 +30,7 @@ Test10_Annika_3h3 ist wie 24h2 nur mit -0.5 °C für Ti unten.
 AB HIER IST ALLES MIT KONSISTENTER WSSA-FORMULIERUNG!
 
 Test11_Annika: Heterogenes Gebiet (oben d_i = 0.3 mm, rho_s = 390 kg/m^3, unten d_i = 309 mm, rho_s = 309 kg/m^3), gekippt mit 10%, 2m x 1m.
-Randbedingungen: oben: 1e-7m/s Regen, Ti=Tw=0°C, rechts: alles no-flow, links: seepage face für hw, Ti, Tw no-flow, unten: Tw no-flow, Ti=-0.5°C, hw seepage face.
+Randbedingungen: oben: 1e-7m/s Regen, Ti=Tw=0°C, links: alles no-flow, rechts: seepage face für hw, Ti, Tw no-flow, unten: Tw no-flow, Ti=-0.5°C, hw seepage face.
 Anfangsbedingungen: Se=1% überall (oben hw=-0.3m, unten hw=-0.2m), Tw=0°C, Ti=Gradient von unten -0.5°C zu 0°C oben, phi=0.468.
 
 Test12_Annika: Homogen, wie Test11, aber Anfangsbedingung hw=-0.18m (Se = 12%).
@@ -40,3 +40,7 @@ AB HIER IST ALLES MIT ANGEPASSTEM RESIDUALWASSERGEHALT!
 Test13_Annika: wie Test11, nur mit no-flow für hw unten.
 
 Test14_Annika: wie Test13 nur homogen und mit h_w,ini = -0.22 m (Se = 1.4%)
+
+AB HIER IST ALLES MIT ANGEPASSTEM SSA_0 FÜR UNTERSCHIEDLICHE SCHICHTEN
+
+Test15_Annika: siehe Test 13, nur jetzt ist halt SSA_0 für die Schichten unterschiedlich

@@ -433,10 +433,12 @@ def solve_system(
 
 
 # Define experiment
+# Change here
 delta_x = 0.02
-height = 0.5
+height = 1
 length = 2
 slope = -1/10 # 10 %
+# This doesn't need changing
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
 boundaries = {
@@ -445,6 +447,7 @@ boundaries = {
     3: lambda x: np.isclose(x[0], P0[0]), # left
     4: lambda x: np.isclose(x[0], P1[0]) # right
     } 
+# Change boundary conditions here
 bc_dict = {
     "top_Ti": {
         "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_i"},
@@ -460,21 +463,21 @@ bc_dict = {
     #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
 
-# layer_params = {
-#     "top": {"d_i": 0.3e-3, "rho_s": 390,
-#         "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
-#     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-#         "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
-# }
+# Change layer parameters here
+layer_params = {
+    "top": {"d_i": 0.3e-3, "rho_s": 390,
+        "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
+    "bottom": {"d_i": 0.4e-3, "rho_s": 309,
+        "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
+}
 
+# Change and define initial conditions here
 def ini_hw(x):
-    return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2)
-
-    
-initial_cond = {"h_w": -0.18,
+    return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
+initial_cond = {"h_w": ini_hw,
                 "phi": 0.468,
                 "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
                 "T_w": 0}
-solve_system("Test14_Annika_wetter", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=12*60*60, saving_interval=30*60, delta_t=1e-2)
+solve_system("Test15_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
 
 # Richtige Parametrisierung gewählt?

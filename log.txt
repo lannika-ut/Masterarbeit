@@ -230,3 +230,7 @@ Richtige Werte für Avanzi einprogrammiert. Angefangen test cases description zu
 16.09.2026 10:00 - 17:00 Uhr
 Homogenen Fall getestet, ist bisschen schwierig, habs jetzt bisschen kleiner gemacht und nasser, jetzt gehts circa, aber bin mir nicht sicher, ob der Cirpka das dann so gut findet weil es schon ein bisschen so aussieht als ob die Porosität oszillieren würde und sich deswegen da der laterale Abfluss bildet...
 Sonst hab ich die Testfälle beschrieben und Kelvin in °C geändert.
+
+18.09.2026 09:00 - 15:30 Uhr
+Was findet der Reinhard wichtig? -> klare Fragestellung und innerer roter Faden, klar was genau Eigenanteil ist, klare Trennung von Methode und Ergebnis/Diskussion
+SSA_0 angepasst, also das ist jetzt unterschiedlich je nach Schneedichte. Außerdem an Einleitung rumgebastelt, die hat jetzt auch die Parameterinkonsistenz mit drin und verweist auf die page 1 figure.
