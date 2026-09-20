@@ -40,6 +40,7 @@ AB HIER IST ALLES MIT ANGEPASSTEM RESIDUALWASSERGEHALT!
 Test13_Annika: wie Test11, nur mit no-flow für hw unten.
 
 Test14_Annika: wie Test13 nur homogen und mit h_w,ini = -0.22 m (Se = 1.4%)
+Test14_Annika_wetter: wie Test14_Annika, nur mit h_w,ini=-0.18 m (Se=12%) und unten T_i=-1
 
 AB HIER IST ALLES MIT ANGEPASSTEM SSA_0 FÜR UNTERSCHIEDLICHE SCHICHTEN
 

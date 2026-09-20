@@ -7,7 +7,7 @@ from dolfinx import fem, io, mesh, plot, geometry # type: ignore
 
 
 def plot_mesh(V, title="Mesh for finite element method"):
-    pv.set_jupyter_backend("html")
+    pv.set_jupyter_backend("html") # "static" should work every time
     cells, types, x = plot.vtk_mesh(V) # convert mesh to vtk data which pyvista can read
     grid = pv.UnstructuredGrid(cells, types, x)
     plotter = pv.Plotter()
@@ -18,97 +18,8 @@ def plot_mesh(V, title="Mesh for finite element method"):
         plotter.show()
     else:
         print("pyvista needs to be used in the default setting of pyvista.OFF_SCREEN=False.")
-
-def plot_mesh2(mesh: mesh.Mesh, values=None, title="Mesh for finite element method"):
-    """
-    Given a DOLFINx mesh, create a `pyvista.UnstructuredGrid`,
-    and plot it and the mesh nodes.
-
-    Args:
-        mesh: The mesh we want to visualize
-        values: List of values indicating a marker for each cell in the mesh
-
-    Note:
-        If `values` are given as input, they are assumed to be a marker
-        for each cell in the domain.
-    """
-    pv.set_jupyter_backend("static")
-    # We create a pyvista plotter instance
-    plotter = pv.Plotter()
-
-    # Since the meshes might be created with higher order elements,
-    # we start by creating a linearized mesh for nicely inspecting the triangulation.
-    V_linear = fem.functionspace(mesh, ("Lagrange", 1))
-    linear_grid = pv.UnstructuredGrid(*plot.vtk_mesh(V_linear))
-
-    # If the mesh is higher order, we plot the nodes on the exterior boundaries,
-    # as well as the mesh itself (with filled in cell markers)
-    if mesh.geometry.cmap.degree > 1:
-        ugrid = pv.UnstructuredGrid(*plot.vtk_mesh(mesh))
-        if values is not None:
-            ugrid.cell_data["Marker"] = values
-        plotter.add_mesh(ugrid, style="points", color="b", point_size=10)
-        ugrid = ugrid.tessellate()
-        plotter.add_mesh(ugrid, show_edges=False)
-        plotter.add_mesh(linear_grid, style="wireframe", color="black")
-    else:
-        # If the mesh is linear we add in the cell markers
-        if values is not None:
-            linear_grid.cell_data["Marker"] = values
-        plotter.add_mesh(linear_grid, show_edges=True)
-
-    # We plot the coordinate axis and align it with the xy-plane
-    plotter.show_axes()
-    plotter.add_title(title)   
-    plotter.view_xy()
-    if not pv.OFF_SCREEN:
-        plotter.show()
-
-
-def evaluate_fct(domain, points, fct):
-    """
-    This is a wrapper function to evaluate multiple dolfinx.fem.function.Function at given points. Explanations to what is going on can either be found in the script FEM_DeflectionOfAMembrane.ipynb or online: https://jsdokken.com/dolfinx-tutorial/chapter1/membrane_code.html.
-
-    Args:
-        domain (dolfinx.mesh.Mesh): Mesh containing the topology (i.e. the cells).
-        points (np.ndarray): Points at which the functions should be evaluated. Shape should be (3, num_points) with x-coordinates in the first, y-coordinates in the second and z-coordinates in the third dimension.
-        fct (dolfinx.fem.function.Function): Function that needs to be evaluated. The function should be a linear combination of the basis functions on the domain, either created by interpolating an expression on a functionspace or by a finite element algorithm.
-
-    Returns:
-        fcts_values (np.ndarray): evaluated points and nan for points outside the mesh or the process.
-    """
-    bb_tree = geometry.bb_tree(domain, domain.topology.dim)
-    cells = []
-    points_on_proc = []
-    # Find cells whose bounding box collide with the points
-    cell_candidates = geometry.compute_collisions_points(bb_tree, points.T)
-    # Choose one of the cells that contains the point
-    colliding_cells = geometry.compute_colliding_cells(domain, 
-                                                       cell_candidates, 
-                                                       points.T)
-    
-    points_not_on_proc = []
-    fct_values = []
-    for i, point in enumerate(points.T):
-        if len(colliding_cells.links(i)) > 0 and len(points_not_on_proc) == 0:
-            points_on_proc.append(point)
-            cells.append(colliding_cells.links(i)[0])
-        if len(colliding_cells.links(i)) > 0 and len(points_not_on_proc) > 0:
-            points_on_proc.append(point)
-            cell_link = colliding_cells.links(i)[0]
-            cells.append(cell_link)
-            fct_values.append(fct.eval(point, cell_link))
-        else:
-            # First time a point is not on the processor: evaluate all valid points
-            if len(points_on_proc) == 0:
-                fct_values.append(fct.eval(np.array(points_on_proc, dtype=np.float64), cells))
-            points_not_on_proc.append(point)
-            fct_values.append(np.nan)
-    fct_values = np.hstack(fct_values)
-    return fct_values
-        
-
-def plotScalarFunction(V, u, warped=False, name = "u", title="", fct_as_array=False, cmap = "viridis"):
+ 
+def plot_scalar_function(V, u, warped=False, name = "u", title="", fct_as_array=False, cmap = "viridis"):
     """
     Plot a dolfinx.function on its grid.
 

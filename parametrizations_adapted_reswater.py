@@ -50,7 +50,7 @@ class Parameter:
         self.layer_params_dict = layer_params
         # minimum effective saturation
         self.S_emin = fem.Constant(domain, PETSc.ScalarType(1e-6))
-        # residual saturation
+        # residual saturation like in Moure et al. (2023)
         self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3))
         # snow/van Genuchten parameters
         if layer_params is not None:
@@ -80,7 +80,7 @@ class Parameter:
             self.alpha = fem.Constant(domain, PETSc.ScalarType(a))
             self.N = fem.Constant(domain, PETSc.ScalarType(n))
             self.min_hw = fem.Constant(
-                domain, PETSc.ScalarType(self.calc_min_hw()))
+                domain, PETSc.ScalarType(self._calc_min_hw()))
             # T_int parameters
             weights = [
                 self.c_pw.value/self.L_sol.value,
@@ -97,8 +97,7 @@ class Parameter:
 
         # from Yamaguchi et al. 2010
         self.theta_r = fem.Constant(domain, PETSc.ScalarType(0.02))
-        # like in Moure et al. (2023)
-        self.S_l = fem.Constant(domain, PETSc.ScalarType(1e-3))
+    
 
     def _assign_material(self, domain):
         """Assign material properties to functions to account for different layer properties.
@@ -202,7 +201,7 @@ class Parameter:
                  }
         return _dict
 
-    def calc_min_hw(self):
+    def _calc_min_hw(self):
         """Calculate min. pressure head such that S_e(h_w)>=Se_min."""
         minhw = (
             -(self.S_emin.value**(self.N.value/(1-self.N.value))

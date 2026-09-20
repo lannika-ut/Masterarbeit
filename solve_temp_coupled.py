@@ -104,6 +104,8 @@ def apply_initial_condition(f, ini, DG0_space=None):
         helper = Function(DG0_space)
         helper.interpolate(ini)
         f.interpolate(helper)
+    elif isinstance(ini, np.ndarray):
+        f.x.array[:] = ini
     else:
         f.x.array[:] = ini*np.ones_like(f.x.array)
     return f
@@ -458,7 +460,7 @@ bc_dict = {
      "right_hw": {
          "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": -1, "variable": "T_i"},
     # "bottom_hw": {
     #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
 }
@@ -474,10 +476,14 @@ layer_params = {
 # Change and define initial conditions here
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
-initial_cond = {"h_w": ini_hw,
-                "phi": 0.468,
-                "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                "T_w": 0}
-solve_system("Test15_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
+fname = "./Masterarbeit/solutions/Test14_Annika_wetter_24h.pkl"
+with open(fname, "rb") as f:
+    prev_data = pickle.load(f)
+initial_cond = {"h_w": prev_data["h_w"][-1],
+                "phi": prev_data["phi"][-1],
+                "T_i": prev_data["T_i"][-1],
+                #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
+                "T_w": prev_data["T_w"][-1]}
+solve_system("Test14_Annika_wetter_24+24h", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
 
 # Richtige Parametrisierung gewählt?
