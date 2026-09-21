@@ -234,3 +234,6 @@ Sonst hab ich die Testfälle beschrieben und Kelvin in °C geändert.
 18.09.2026 09:00 - 15:30 Uhr
 Was findet der Reinhard wichtig? -> klare Fragestellung und innerer roter Faden, klar was genau Eigenanteil ist, klare Trennung von Methode und Ergebnis/Diskussion
 SSA_0 angepasst, also das ist jetzt unterschiedlich je nach Schneedichte. Außerdem an Einleitung rumgebastelt, die hat jetzt auch die Parameterinkonsistenz mit drin und verweist auf die page 1 figure.
+
+21.09.2026 09:00 - 16:30 Uhr 
+Validierung Ergebnisse und Diskussion geschrieben. Morgen Vormittag sollte ich mir überlegen, wie ich am besten meine nicht-isothermen Ergebnisse darstellen will. Dann kann ich die gleich auch so dem Cirpka präsentieren.
