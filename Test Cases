@@ -45,3 +45,5 @@ Test14_Annika_wetter: wie Test14_Annika, nur mit h_w,ini=-0.18 m (Se=12%) und un
 AB HIER IST ALLES MIT ANGEPASSTEM SSA_0 FÜR UNTERSCHIEDLICHE SCHICHTEN
 
 Test15_Annika: siehe Test 13, nur jetzt ist halt SSA_0 für die Schichten unterschiedlich
+
+Test16_Annika: Anfangsbedingung: Ergebnisse nach 24h von Test15 (Kapillarsperre). Randbedingung: T_i=-5°C oben, unten -0.5°C, rechts seepage face, sonst alles no-flow. Läuft für 12h. 

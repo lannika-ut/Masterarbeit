@@ -1,11 +1,11 @@
 To dos:
 Code
-- SSA0 für versch. layer einprogrammieren?
 - ganz am Schluss: Code aufräumen, insb. function files.
 - einen ordentlichen Ordner auf github hochladen mit allem Code der nötig ist um das Modell laufen zu lassen und dann auch noch vllt view_solutions_nonisothermal zur Auswertung, außerdem auch noch Bild vom Aufbau hochladen
 
 
 Report
+- Abstract
 - Introduction: state  of the art auch erwähnen dass Parametrisierung mit ungültigen Dichte Bereichen für Yamaguchi Parametrisierung..., Page 1 Figure einfügen
 - Theory: Gleichungen, finite Elemente
 - Methods: numerische Implementierung (= Eigenleistung)

@@ -51,7 +51,7 @@ class BoundaryCondition:
                 bc_dict = {
                 key: {
                     "marker": marks_boundary (int),
-                    "name": type_of_bc("Dirichlet", "Neumann" or "seepage face"),
+                    "name": type_of_bc("Dirichlet", "Neumann", "Robin" or "seepage face"),
                     "value": boundary_value_or_function,
                     "functionspace": fem.functionspace,
                     "testfunction": ufl.TestFunction,
@@ -60,7 +60,7 @@ class BoundaryCondition:
                 }.
                 If the name is "seepage face" the value needs to be a characteristic length (thin saturated boundary layer).
         Raises:
-            TypeError: Boundary condition unknown (name neither Dirichlet, Neumann, seepage face).
+            TypeError: Boundary condition unknown (name neither Dirichlet, Neumann, Robin, seepage face).
 
         Returns:
             dict: Dictionnary containing either the fem.dirichletbc or the integral over the Neumann or seepage face boundary of the function*testfunction. {key: dirichlet_Neumann_or_seepageface}. The key is the same as in bc_dict.
@@ -81,10 +81,12 @@ class BoundaryCondition:
                     bc = fem.dirichletbc(u_D, dofsD, V)                
             elif values["name"] == "Neumann":
                 bc = values["testfunction"]*values["value"]*self.ds(marker)
+            elif values["name"] == "Robin":
+                bc = values["value"]
             elif values["name"] == "seepage face":
                 bc = values["value"]
             else:
                 raise ValueError(
-                    f"Unknown boundary condition, maybe you misspelled. Accepted are 'Dirichlet', 'Neumann' and 'seepage face'. Got: {values['name']}")
+                    f"Unknown boundary condition, maybe you misspelled. Accepted are 'Dirichlet', 'Neumann', 'Robin', and 'seepage face'. Got: {values['name']}")
             bcs[key] = bc
         return bcs

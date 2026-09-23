@@ -20,7 +20,7 @@ from ufl import (
     grad, dx, dot, outer,
     SpatialCoordinate, TestFunction, TrialFunction,
     rhs, lhs, system,
-    conditional, ge,
+    conditional, ge, inner,
 )
 from petsc4py import PETSc
 import pickle
@@ -259,6 +259,10 @@ def solve_system(
                           *conditional(ge(h_w, 0), h_w, 0) * bc.ds(d["marker"]))
                 F_hw2 += (v_hw * p.K_s(phi) / bcs[key]
                           *conditional(ge(h_w, 0), h_w, 0) * bc.ds(d["marker"]))
+        elif d["name"] == "Robin":
+            if d["variable"] == "T_i":
+                F_Ti += (bcs[key][0] *
+                         inner(T_i - bcs[key][1], v_Ti) * bc.ds(d["marker"]))
     
     # Create solver structure
     snes1 = PETSc.SNES().create()
@@ -452,17 +456,15 @@ boundaries = {
 # Change boundary conditions here
 bc_dict = {
     "top_Ti": {
-        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_i"},
-    "top_Tw": {
-        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
-    "top_hw": {
-        "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
-     "right_hw": {
-         "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
-    "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": -1, "variable": "T_i"},
-    # "bottom_hw": {
-    #     "marker": 2, "name": "seepage face", "value": delta_x, "variable": "h_w"},
+        "marker": 1, "name": "Dirichlet", "value": -5, "variable": "T_i"},
+    # "top_Tw": {
+    #     "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
+    # "top_hw": {
+    #     "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
+    "right_hw": {
+        "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
+    "bottom_Tw": {
+        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
 }
 
 # Change layer parameters here
@@ -473,17 +475,18 @@ layer_params = {
         "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
 }
 
+
 # Change and define initial conditions here
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
-fname = "./Masterarbeit/solutions/Test14_Annika_wetter_24h.pkl"
+fname = "./Masterarbeit/solutions/Test15_Annika_24h.pkl"
 with open(fname, "rb") as f:
     prev_data = pickle.load(f)
 initial_cond = {"h_w": prev_data["h_w"][-1],
                 "phi": prev_data["phi"][-1],
-                "T_i": prev_data["T_i"][-1],
                 #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
+                "T_i": prev_data["T_i"][-1],
                 "T_w": prev_data["T_w"][-1]}
-solve_system("Test14_Annika_wetter_24+24h", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=24*60*60, saving_interval=30*60, delta_t=1e-2)
+solve_system("Test16_Annika_freezing", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=12*60*60, saving_interval=30*60, delta_t=1e-2)
 
 # Richtige Parametrisierung gewählt?
