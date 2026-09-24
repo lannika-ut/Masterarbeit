@@ -28,7 +28,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-3
-    max_dt = 2
+    max_dt = 1e-2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -279,7 +279,7 @@ def solve_system(
         "ksp_error_if_not_converged": True,
         "ksp_type": "gmres",
         "ksp_rtol": 1e-4,
-        "ksp_atol": 1e-6,
+        "ksp_atol": 1e-7,
         "pc_type": "hypre",
         "pc_hypre_type": "boomeramg",
         "pc_hypre_boomeramg_max_iter": 1,
@@ -356,7 +356,7 @@ def solve_system(
         err_i = 100
         err_w = 100
         k = 0
-        while k <= 5 and err_i > 1e-5:
+        while k <= 5 and err_w > 1e-5:
             Ti_old_picard = T_i_h.x.array.copy()
             Tw_old_picard = T_w_h.x.array.copy()
             problem_Tw = LinearProblem(
@@ -442,7 +442,7 @@ def solve_system(
 # Change here
 delta_x = 0.02
 height = 1
-length = 2
+length = 1
 slope = -1/10 # 10 %
 # This doesn't need changing
 geom = Geometry(height, length, slope)
@@ -453,18 +453,19 @@ boundaries = {
     3: lambda x: np.isclose(x[0], P0[0]), # left
     4: lambda x: np.isclose(x[0], P1[0]) # right
     } 
+
 # Change boundary conditions here
 bc_dict = {
     "top_Ti": {
-        "marker": 1, "name": "Dirichlet", "value": -5, "variable": "T_i"},
-    # "top_Tw": {
-    #     "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
-    # "top_hw": {
-    #     "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
+        "marker": 1, "name": "Dirichlet", "value": -1, "variable": "T_i"},
+    "top_Tw": {
+        "marker": 1, "name": "Dirichlet", "value": 2, "variable": "T_w"},
+    "top_hw": {
+        "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
     "right_hw": {
         "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Tw": {
-        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_i"},
 }
 
 # Change layer parameters here
@@ -475,18 +476,17 @@ layer_params = {
         "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
 }
 
-
 # Change and define initial conditions here
 def ini_hw(x):
     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
-fname = "./Masterarbeit/solutions/Test15_Annika_24h.pkl"
+fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
 with open(fname, "rb") as f:
     prev_data = pickle.load(f)
-initial_cond = {"h_w": prev_data["h_w"][-1],
-                "phi": prev_data["phi"][-1],
+initial_cond = {"h_w": ini_hw,
+                "phi": 0.468,
                 #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": prev_data["T_i"][-1],
-                "T_w": prev_data["T_w"][-1]}
-solve_system("Test16_Annika_freezing", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=12*60*60, saving_interval=30*60, delta_t=1e-2)
+                "T_i": lambda x: -1/height*(x[1] - slope*x[0]),
+                "T_w": 0}
+solve_system("Test18_Annika_5min", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=5*60, saving_interval=1, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
