@@ -189,9 +189,9 @@ def solve_system(
     # Weak formulation
     tau = Constant(domain, PETSc.ScalarType(0.01))
     F_hw1 = (
-        v_hw * (p.theta(p.S_e(h_w), phi1) -
+        v_hw * (p.theta(p.S_e(h_w), phi_old) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
-        + dot(grad(v_hw), (p.K_s(phi1)*krel*grad(x[1]+h_w)))*dx
+        + dot(grad(v_hw), (p.K_s(phi_old)*krel*grad(x[1]+h_w)))*dx
         - v_hw*p.rho_i/p.rho_w*source_mass*dx
     )
     F_hw2 = (
@@ -321,25 +321,26 @@ def solve_system(
         krel.x.array[:] = new_krel.x.array.copy()
         krel.x.scatter_forward()
 
-        # Calculate source term
-        new_source = p.calc_source_term(h_w_old, phi_old, T_i_old, T_w_old)
-        source_mass.x.array[:] = new_source.x.array.copy()
-        source_mass.x.scatter_forward()
-
-        # Update porosity
-        max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
-        source_term = np.clip(source_mass.x.array, -max_source, max_source)
-        phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
-        phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
-
         # Solve Richards
         sol_vec, repeat_time_step, new_dt = solve_Richards(
-            h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename, phi1, T_i_old, T_w_old)
+            h_w, h_w_old, snes1, problem_hw1, b_hw1, J_hw1, delta_t, t, tmp, filename, phi_old, T_i_old, T_w_old)
         if repeat_time_step:
             delta_t.value = new_dt
             continue
         sol_vec.copy(h_w1.x.petsc_vec)  # copy solution into h_w1
         h_w1.x.scatter_forward()
+
+        # Calculate source term
+        new_source = p.calc_source_term(h_w1, phi_old, T_i_old, T_w_old)
+        source_mass.x.array[:] = new_source.x.array.copy()
+        source_mass.x.scatter_forward()
+        
+        # Update porosity
+        max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
+        #source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        source_term = source_mass.x.array
+        phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
+        phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
         
         # Update krel with new pressure head
         new_krel = p.upwind_krel(h_w1, domain)
@@ -385,7 +386,8 @@ def solve_system(
         source_mass.x.scatter_forward()
 
         # Update porosity again 
-        source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        #source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        source_term = source_mass.x.array
         phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
         phi.x.array[:] = np.clip(phi.x.array, 0, 1)
 
@@ -440,10 +442,10 @@ def solve_system(
 
 # Define experiment
 # Change here
-delta_x = 0.02
+delta_x = 0.005
 height = 1
-length = 1
-slope = -1/10 # 10 %
+length = delta_x
+slope = 0 # 10 %
 # This doesn't need changing
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -457,14 +459,12 @@ boundaries = {
 # Change boundary conditions here
 bc_dict = {
     "top_Ti": {
-        "marker": 1, "name": "Dirichlet", "value": -1, "variable": "T_i"},
+        "marker": 1, "name": "Dirichlet", "value": -2, "variable": "T_i"},
     "top_Tw": {
         "marker": 1, "name": "Dirichlet", "value": 2, "variable": "T_w"},
     "top_hw": {
         "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
-    "right_hw": {
-        "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
-    "bottom_Tw": {
+    "bottom_Ti": {
         "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_i"},
 }
 
@@ -477,16 +477,17 @@ layer_params = {
 }
 
 # Change and define initial conditions here
-def ini_hw(x):
-    return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
-fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
-with open(fname, "rb") as f:
-    prev_data = pickle.load(f)
-initial_cond = {"h_w": ini_hw,
+# def ini_hw(x):
+#     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
+# fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
+# with open(fname, "rb") as f:
+#     prev_data = pickle.load(f)
+initial_cond = {"h_w": -0.22,
                 "phi": 0.468,
                 #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": lambda x: -1/height*(x[1] - slope*x[0]),
+                "T_i": lambda x: -2/height*x[1],
                 "T_w": 0}
-solve_system("Test18_Annika_5min", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=5*60, saving_interval=1, delta_t=1e-3)
+solve_system("Test19_Annika_60s_", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
+# Porosität ist gerade ungekappt, als allererstes wird hw gelöst

@@ -47,3 +47,8 @@ AB HIER IST ALLES MIT ANGEPASSTEM SSA_0 FÜR UNTERSCHIEDLICHE SCHICHTEN
 Test15_Annika: siehe Test 13, nur jetzt ist halt SSA_0 für die Schichten unterschiedlich
 
 Test16_Annika: Anfangsbedingung: Ergebnisse nach 24h von Test15 (Kapillarsperre). Randbedingung: T_i=-5°C oben, unten -0.5°C, rechts seepage face, sonst alles no-flow. Läuft für 12h. 
+
+Test19_Annika: LTNE testen. 1-D 1m hohe, homogene Schneesäule, 5mm Auflösung, 
+max. dt=0.01s, T_end=60s. Randbedingung oben: Ti=-2, Tw=2, q_top=1e-8, unten Tw=0.
+Anfangsbedingung: hw=-0.21m (Se=4%), Ti Gradient -2->0, Tw=0, phi=0.468.
+Test19_Annika_: wie oben, nur mit q_top=-1e-7 und anfangs hw=-0.22m (Se=1.4%)
