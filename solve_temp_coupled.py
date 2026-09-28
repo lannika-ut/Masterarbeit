@@ -28,7 +28,7 @@ import pickle
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
     min_dt = 1e-3
-    max_dt = 1e-2
+    max_dt = 2
     new_dt = delta_t.value
     repeat_time_step = False
     h_w.x.array[:] = h_w_old.x.array
@@ -442,10 +442,10 @@ def solve_system(
 
 # Define experiment
 # Change here
-delta_x = 0.005
+delta_x = 0.02
 height = 1
-length = delta_x
-slope = 0 # 10 %
+length = 2
+slope = -1/10 # 10 %
 # This doesn't need changing
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -459,35 +459,44 @@ boundaries = {
 # Change boundary conditions here
 bc_dict = {
     "top_Ti": {
-        "marker": 1, "name": "Dirichlet", "value": -2, "variable": "T_i"},
+        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_i"},
     "top_Tw": {
-        "marker": 1, "name": "Dirichlet", "value": 2, "variable": "T_w"},
+        "marker": 1, "name": "Dirichlet", "value": 0, "variable": "T_w"},
     "top_hw": {
         "marker": 1, "name": "Neumann", "value": -1e-7, "variable": "h_w"},
+    "right_hw": {
+        "marker": 4, "name": "seepage face", "value": delta_x, "variable": "h_w"},
     "bottom_Ti": {
-        "marker": 2, "name": "Dirichlet", "value": 0, "variable": "T_i"},
+        "marker": 2, "name": "Dirichlet", "value": -0.5, "variable": "T_i"},
 }
 
 # Change layer parameters here
 layer_params = {
-    "top": {"d_i": 0.3e-3, "rho_s": 390,
-        "locator": lambda x: x[1] >= slope*x[0]+P3[1]/2},
+    "top": {"d_i": 0.4e-3, "rho_s": 309,
+        "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]*3/5},
+    "middle": {"d_i": 0.3e-3, "rho_s": 390,
+        "locator": lambda x: np.logical_and(
+            x[1] < geom.slope*x[0]+P3[1]*3/5,
+            x[1] >= geom.slope*x[0]+P3[1]*2/5)},
     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-        "locator": lambda x: x[1] < slope*x[0]+P3[1]/2},
+        "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]*2/5},
 }
 
 # Change and define initial conditions here
-# def ini_hw(x):
-#     return np.where(x[1] >= slope*x[0] + P3[1]/2, -0.3, -0.2) 
+def ini_hw(x):
+    return np.where(
+        np.logical_and(
+            x[1] < slope*x[0]+P3[1]*3/5, x[1] >= slope*x[0]+P3[1]*2/5),
+            -0.3, -0.2) 
 # fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
 # with open(fname, "rb") as f:
 #     prev_data = pickle.load(f)
-initial_cond = {"h_w": -0.22,
+initial_cond = {"h_w": ini_hw,
                 "phi": 0.468,
-                #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": lambda x: -2/height*x[1],
+                "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
+                #"T_i": lambda x: -2/height*x[1],
                 "T_w": 0}
-solve_system("Test19_Annika_60s_", geom, delta_x, boundaries, bc_dict, initial_cond, T_end=60, saving_interval=1, delta_t=1e-3)
+solve_system("Test20_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
 # Porosität ist gerade ungekappt, als allererstes wird hw gelöst

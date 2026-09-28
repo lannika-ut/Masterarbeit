@@ -252,3 +252,6 @@ Sonst hab ich nur dumm rumgesessen und ein bisschen an meinen Plots gearbeitet. 
 
 25.09.2026 09:00 - 15:00 Uhr
 1-D Testfall von rain-on-snow event. Das hab ich jetzt nur für 1 Minute simuliert mit super kleinen Zeitschritten. Ist ok, aber macht trotzdem crazy Dinge, muss ich wirklich mal mit der Anne besprechen... Sonst hab ich den Testfall beschrieben und Ergebnis von Test 3 (Eisschicht am Boden) beschrieben und diskutiert. Das ist aber sehr kurz geworden, da gibts aber halt auch nicht so viel zum Beschreiben...
+
+28.09.2026 09:00 - 16:00 Uhr
+Ergebnisse geschrieben, heterogenen Fall also Kapillarsperre beschrieben und bisschen diskutiert, schicke Plots gemacht. Kapillarsperre ins mittlere Fünftel des Gebiets gepackt, damit es aussieht wie in meinem Schema. Hat gut funktioniert.
