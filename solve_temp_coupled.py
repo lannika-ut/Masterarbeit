@@ -445,7 +445,7 @@ def solve_system(
 delta_x = 0.02
 height = 1
 length = 2
-slope = -1/10 # 10 %
+slope = -1/20 # 10 %
 # This doesn't need changing
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -471,23 +471,26 @@ bc_dict = {
 }
 
 # Change layer parameters here
+# layer_params = {
+#     "top": {"d_i": 0.4e-3, "rho_s": 309,
+#         "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]*3/5},
+#     "middle": {"d_i": 0.3e-3, "rho_s": 390,
+#         "locator": lambda x: np.logical_and(
+#             x[1] < geom.slope*x[0]+P3[1]*3/5,
+#             x[1] >= geom.slope*x[0]+P3[1]*2/5)},
+#     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
+#         "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]*2/5},
+# }
 layer_params = {
-    "top": {"d_i": 0.4e-3, "rho_s": 309,
-        "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]*3/5},
-    "middle": {"d_i": 0.3e-3, "rho_s": 390,
-        "locator": lambda x: np.logical_and(
-            x[1] < geom.slope*x[0]+P3[1]*3/5,
-            x[1] >= geom.slope*x[0]+P3[1]*2/5)},
+    "top": {"d_i": 0.3e-3, "rho_s": 390,
+        "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]/2},
     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-        "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]*2/5},
+        "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]/2},
 }
 
 # Change and define initial conditions here
 def ini_hw(x):
-    return np.where(
-        np.logical_and(
-            x[1] < slope*x[0]+P3[1]*3/5, x[1] >= slope*x[0]+P3[1]*2/5),
-            -0.3, -0.2) 
+    return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.3, -0.2) 
 # fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
 # with open(fname, "rb") as f:
 #     prev_data = pickle.load(f)
@@ -496,7 +499,7 @@ initial_cond = {"h_w": ini_hw,
                 "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
                 #"T_i": lambda x: -2/height*x[1],
                 "T_w": 0}
-solve_system("Test20_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
+solve_system("Test15_Annika_24h_flatter", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
 # Porosität ist gerade ungekappt, als allererstes wird hw gelöst
