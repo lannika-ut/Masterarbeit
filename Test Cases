@@ -54,3 +54,5 @@ Anfangsbedingung: hw=-0.21m (Se=4%), Ti Gradient -2->0, Tw=0, phi=0.468.
 Test19_Annika_: wie oben, nur mit q_top=-1e-7 und anfangs hw=-0.22m (Se=1.4%)
 
 Test20_Annika: wie Test15 (heterogen, Kapillarsperre), aber feine Schicht im mittleren Fünftel, sonst grober Schnee, 24h, 2cm Auflösung
+
+Test21_Annika: slabs

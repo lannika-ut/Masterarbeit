@@ -6,7 +6,7 @@ Code
 
 Report
 - Abstract
-- Introduction: state  of the art auch erwähnen dass Parametrisierung mit ungültigen Dichte Bereichen für Yamaguchi Parametrisierung..., Page 1 Figure einfügen
+- Introduction
 - Theory: Gleichungen, finite Elemente
 - Methods: numerische Implementierung (= Eigenleistung)
 - Testfälle beschreiben das soll nicht in Ergebnisteil

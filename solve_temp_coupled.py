@@ -24,6 +24,7 @@ from ufl import (
 )
 from petsc4py import PETSc
 import pickle
+from functools import reduce
 
 def solve_Richards(
         h_w, h_w_old, snes, problem, b, J, delta_t, t, tmp, filename, phi, Ti, Tw):
@@ -189,9 +190,9 @@ def solve_system(
     # Weak formulation
     tau = Constant(domain, PETSc.ScalarType(0.01))
     F_hw1 = (
-        v_hw * (p.theta(p.S_e(h_w), phi_old) -
+        v_hw * (p.theta(p.S_e(h_w), phi1) -
                 p.theta(p.S_e(h_w_old), phi_old)) / delta_t * dx
-        + dot(grad(v_hw), (p.K_s(phi_old)*krel*grad(x[1]+h_w)))*dx
+        + dot(grad(v_hw), (p.K_s(phi1)*krel*grad(x[1]+h_w)))*dx
         - v_hw*p.rho_i/p.rho_w*source_mass*dx
     )
     F_hw2 = (
@@ -316,6 +317,17 @@ def solve_system(
 
     # Time loop
     while t <= T_end:
+        # Calculate source term
+        new_source = p.calc_source_term(h_w_old, phi_old, T_i_old, T_w_old)
+        source_mass.x.array[:] = new_source.x.array.copy()
+        source_mass.x.scatter_forward()
+        
+        # Update porosity
+        max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
+        source_term = np.clip(source_mass.x.array, -max_source, max_source)
+        phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
+        phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
+        
         # Upwind krel
         new_krel = p.upwind_krel(h_w_old, domain)
         krel.x.array[:] = new_krel.x.array.copy()
@@ -329,18 +341,6 @@ def solve_system(
             continue
         sol_vec.copy(h_w1.x.petsc_vec)  # copy solution into h_w1
         h_w1.x.scatter_forward()
-
-        # Calculate source term
-        new_source = p.calc_source_term(h_w1, phi_old, T_i_old, T_w_old)
-        source_mass.x.array[:] = new_source.x.array.copy()
-        source_mass.x.scatter_forward()
-        
-        # Update porosity
-        max_source = 0.1 * phi_old.x.array / delta_t.value  # Limit to 10% change per step
-        #source_term = np.clip(source_mass.x.array, -max_source, max_source)
-        source_term = source_mass.x.array
-        phi1.x.array[:] = phi_old.x.array + delta_t.value * source_term
-        phi1.x.array[:] = np.clip(phi1.x.array, 0, 1)
         
         # Update krel with new pressure head
         new_krel = p.upwind_krel(h_w1, domain)
@@ -357,7 +357,7 @@ def solve_system(
         err_i = 100
         err_w = 100
         k = 0
-        while k <= 5 and err_w > 1e-5:
+        while k <= 5 and err_i > 1e-5:
             Ti_old_picard = T_i_h.x.array.copy()
             Tw_old_picard = T_w_h.x.array.copy()
             problem_Tw = LinearProblem(
@@ -386,8 +386,7 @@ def solve_system(
         source_mass.x.scatter_forward()
 
         # Update porosity again 
-        #source_term = np.clip(source_mass.x.array, -max_source, max_source)
-        source_term = source_mass.x.array
+        source_term = np.clip(source_mass.x.array, -max_source, max_source)
         phi.x.array[:] = phi_old.x.array + delta_t.value * source_term
         phi.x.array[:] = np.clip(phi.x.array, 0, 1)
 
@@ -445,7 +444,7 @@ def solve_system(
 delta_x = 0.02
 height = 1
 length = 2
-slope = -1/20 # 10 %
+slope = -1/10 # 10 %
 # This doesn't need changing
 geom = Geometry(height, length, slope)
 [P0, P1, P2, P3] = geom.corner_points
@@ -472,34 +471,56 @@ bc_dict = {
 
 # Change layer parameters here
 # layer_params = {
-#     "top": {"d_i": 0.4e-3, "rho_s": 309,
-#         "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]*3/5},
-#     "middle": {"d_i": 0.3e-3, "rho_s": 390,
-#         "locator": lambda x: np.logical_and(
-#             x[1] < geom.slope*x[0]+P3[1]*3/5,
-#             x[1] >= geom.slope*x[0]+P3[1]*2/5)},
-#     "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-#         "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]*2/5},
+#     "top": {"d_i": 0.3e-3, "rho_s": 390,
+#         "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]/2},
+#     "bottom": {"d_i": 0.32e-3, "rho_s": 385,
+#         "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]/2},
 # }
+
+# slab layout
+slab_len = 0.24 # length in x
+slab_h = 0.04 # thickness (2 * delta_x)
+tol = 1e-9
+
+# (x_start, s_center)
+slabs = [
+    (0.20, 0.78), (0.80, 0.78), (geom.length - slab_len, 0.78),
+    (0.50, 0.50), (1.20, 0.50),
+    (0.05, 0.22), (0.90, 0.22), (1.50, 0.22),
+]
+
+def make_slab_locator(x_start, s_c):
+    def locator(x):
+        s = x[1] - geom.slope * x[0]
+        return ((x[0] >= x_start - tol) & (x[0] <= x_start + slab_len + tol)
+                & (np.abs(s - s_c) <= slab_h / 2 + tol))
+    return locator
+
+slab_locators = [make_slab_locator(xs, sc) for xs, sc in slabs]
+
+def in_any_slab(x):
+    return reduce(lambda a, b: a | b, (loc(x) for loc in slab_locators))
+
 layer_params = {
-    "top": {"d_i": 0.3e-3, "rho_s": 390,
-        "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]/2},
-    "bottom": {"d_i": 0.4e-3, "rho_s": 309,
-        "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]/2},
+    "background": {"d_i": 0.4e-3, "rho_s": 350,
+                   "locator": lambda x: np.logical_not(in_any_slab(x))},
 }
+for i, loc in enumerate(slab_locators):
+    layer_params[f"slab_{i}"] = {"d_i": 0.3e-3, "rho_s": 350, "locator": loc}
 
 # Change and define initial conditions here
 def ini_hw(x):
-    return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.3, -0.2) 
-# fname = "./Masterarbeit/solutions/Test16_Annika_freezing.pkl"
-# with open(fname, "rb") as f:
-#     prev_data = pickle.load(f)
-initial_cond = {"h_w": ini_hw,
-                "phi": 0.468,
-                "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                #"T_i": lambda x: -2/height*x[1],
-                "T_w": 0}
-solve_system("Test15_Annika_24h_flatter", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
+    #return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.3, -0.2) # layered
+    return np.where(np.logical_not(in_any_slab(x)), -0.22, -0.28) # slabs
+
+fname = "./Masterarbeit/solutions/Test21_Annika_24h.pkl"
+with open(fname, "rb") as f:
+    prev_data = pickle.load(f)
+initial_cond = {"h_w": prev_data["h_w"][48],
+                "phi": prev_data["phi"][48],
+                #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
+                "T_i": prev_data["T_i"][48],
+                "T_w": prev_data["T_w"][48]}
+solve_system("Test21_Annika_24+12h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=12*60*60, saving_interval=30*60, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
-# Porosität ist gerade ungekappt, als allererstes wird hw gelöst
