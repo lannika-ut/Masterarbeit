@@ -478,15 +478,15 @@ bc_dict = {
 # }
 
 # slab layout
-slab_len = 0.24 # length in x
-slab_h = 0.04 # thickness (2 * delta_x)
+slab_len = 0.5 # length in x
+slab_h = 0.1 # thickness (2 * delta_x)
 tol = 1e-9
 
 # (x_start, s_center)
 slabs = [
-    (0.20, 0.78), (0.80, 0.78), (geom.length - slab_len, 0.78),
+    (0.20, 0.78), (0.80, 0.7), (geom.length - slab_len, 0.78),
     (0.50, 0.50), (1.20, 0.50),
-    (0.05, 0.22), (0.90, 0.22), (1.50, 0.22),
+    (0.05, 0.26), (0.90, 0.3), (1.50, 0.2),
 ]
 
 def make_slab_locator(x_start, s_c):
@@ -513,14 +513,14 @@ def ini_hw(x):
     #return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.3, -0.2) # layered
     return np.where(np.logical_not(in_any_slab(x)), -0.22, -0.28) # slabs
 
-fname = "./Masterarbeit/solutions/Test21_Annika_24h.pkl"
-with open(fname, "rb") as f:
-    prev_data = pickle.load(f)
-initial_cond = {"h_w": prev_data["h_w"][48],
-                "phi": prev_data["phi"][48],
-                #"T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
-                "T_i": prev_data["T_i"][48],
-                "T_w": prev_data["T_w"][48]}
-solve_system("Test21_Annika_24+12h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=12*60*60, saving_interval=30*60, delta_t=1e-3)
+# fname = "./Masterarbeit/solutions/Test21_Annika_24h.pkl"
+# with open(fname, "rb") as f:
+#     prev_data = pickle.load(f)
+initial_cond = {"h_w": ini_hw,
+                "phi": 0.468,
+                "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
+                #"T_i": lambda x: -2/height*x[1],
+                "T_w": 0}
+solve_system("Test21_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
