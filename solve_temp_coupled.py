@@ -1,5 +1,5 @@
 import numpy as np
-from parametrizations_adapted_reswater import Parameter
+from parametrizations_adapted_vG import Parameter
 from boundary_condition import BoundaryCondition
 from geometry_class import Geometry
 from nonlinear_snes_problem import NonlinearPDE_SNESProblem
@@ -379,6 +379,8 @@ def solve_system(
         # Update temperatures
         T_i_old.x.array[:] = T_i_h.x.array.copy()
         T_w_old.x.array[:] = T_w_h.x.array.copy()
+        #T_i_old.x.array[:] = np.clip(T_i_h.x.array.copy(), None, 0.01)
+        #T_w_old.x.array[:] = np.clip(T_w_h.x.array.copy(), -0.01, None)
 
         # Update source term with new values
         new_source = p.calc_source_term(h_w1, phi1, T_i_h, T_w_h)
@@ -470,48 +472,48 @@ bc_dict = {
 }
 
 # Change layer parameters here
-# layer_params = {
-#     "top": {"d_i": 0.3e-3, "rho_s": 390,
-#         "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]/2},
-#     "bottom": {"d_i": 0.32e-3, "rho_s": 385,
-#         "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]/2},
-# }
+layer_params = {
+    "top": {"d_i": 0.3e-3, "rho_s": 390,
+        "locator": lambda x: x[1] >= geom.slope*x[0]+P3[1]/2},
+    "bottom": {"d_i": 0.4e-3, "rho_s": 309,
+        "locator": lambda x: x[1] < geom.slope*x[0]+P3[1]/2},
+}
 
 # slab layout
-slab_len = 0.5 # length in x
-slab_h = 0.1 # thickness (2 * delta_x)
-tol = 1e-9
+# slab_len = 0.5 # length in x
+# slab_h = 0.1 # thickness (2 * delta_x)
+# tol = 1e-9
 
-# (x_start, s_center)
-slabs = [
-    (0.20, 0.78), (0.80, 0.7), (geom.length - slab_len, 0.78),
-    (0.50, 0.50), (1.20, 0.50),
-    (0.05, 0.26), (0.90, 0.3), (1.50, 0.2),
-]
+# # (x_start, s_center)
+# slabs = [
+#     (0.20, 0.78), (0.80, 0.7), (geom.length - slab_len, 0.78),
+#     (0.50, 0.50), (1.20, 0.50),
+#     (0.05, 0.26), (0.90, 0.3), (1.50, 0.2),
+# ]
 
-def make_slab_locator(x_start, s_c):
-    def locator(x):
-        s = x[1] - geom.slope * x[0]
-        return ((x[0] >= x_start - tol) & (x[0] <= x_start + slab_len + tol)
-                & (np.abs(s - s_c) <= slab_h / 2 + tol))
-    return locator
+# def make_slab_locator(x_start, s_c):
+#     def locator(x):
+#         s = x[1] - geom.slope * x[0]
+#         return ((x[0] >= x_start - tol) & (x[0] <= x_start + slab_len + tol)
+#                 & (np.abs(s - s_c) <= slab_h / 2 + tol))
+#     return locator
 
-slab_locators = [make_slab_locator(xs, sc) for xs, sc in slabs]
+# slab_locators = [make_slab_locator(xs, sc) for xs, sc in slabs]
 
-def in_any_slab(x):
-    return reduce(lambda a, b: a | b, (loc(x) for loc in slab_locators))
+# def in_any_slab(x):
+#     return reduce(lambda a, b: a | b, (loc(x) for loc in slab_locators))
 
-layer_params = {
-    "background": {"d_i": 0.4e-3, "rho_s": 350,
-                   "locator": lambda x: np.logical_not(in_any_slab(x))},
-}
-for i, loc in enumerate(slab_locators):
-    layer_params[f"slab_{i}"] = {"d_i": 0.3e-3, "rho_s": 350, "locator": loc}
+# layer_params = {
+#     "background": {"d_i": 0.4e-3, "rho_s": 350,
+#                    "locator": lambda x: np.logical_not(in_any_slab(x))},
+# }
+# for i, loc in enumerate(slab_locators):
+#     layer_params[f"slab_{i}"] = {"d_i": 0.3e-3, "rho_s": 350, "locator": loc}
 
-# Change and define initial conditions here
+# # Change and define initial conditions here
 def ini_hw(x):
-    #return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.3, -0.2) # layered
-    return np.where(np.logical_not(in_any_slab(x)), -0.22, -0.28) # slabs
+    return np.where(x[1] >= geom.slope*x[0]+P3[1]/2, -0.35, -0.3) # layered
+    #return np.where(np.logical_not(in_any_slab(x)), -0.22, -0.28) # slabs
 
 # fname = "./Masterarbeit/solutions/Test21_Annika_24h.pkl"
 # with open(fname, "rb") as f:
@@ -521,6 +523,8 @@ initial_cond = {"h_w": ini_hw,
                 "T_i": lambda x: 0.5/height*(x[1] - slope*x[0]) - 0.5,
                 #"T_i": lambda x: -2/height*x[1],
                 "T_w": 0}
-solve_system("Test21_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
+solve_system("Test22_Annika_24h", geom, delta_x, boundaries, bc_dict, initial_cond, layer_params=layer_params, T_end=24*60*60, saving_interval=30*60, delta_t=1e-3)
 
 # Richtige Parametrisierung gewählt?
+# Ti, Tw geklippt
+# in Tint grad noch rho_i statt rho_w

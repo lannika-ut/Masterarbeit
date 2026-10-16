@@ -85,9 +85,9 @@ class Parameter:
             weights = [
                 self.c_pw.value/self.L_sol.value,
                 self.beta_sol.value*self.K_i.value /
-                (self.rho_w.value*self.L_sol.value*self.r_i.value),
+                (self.rho_i.value*self.L_sol.value*self.r_i.value),
                 self.beta_sol.value*self.K_w.value /
-                (self.rho_w.value*self.L_sol.value*self.r_w.value)
+                (self.rho_i.value*self.L_sol.value*self.r_w.value)
             ]
             self.a_i = fem.Constant(
                 domain, PETSc.ScalarType(weights[1]/np.sum(weights)))
@@ -155,9 +155,9 @@ class Parameter:
                     weights = [
                         self.c_pw.value/self.L_sol.value,
                         self.beta_sol.value*self.K_i.value /
-                        (self.rho_w.value*self.L_sol.value*ri_vals[c]),
+                        (self.rho_i.value*self.L_sol.value*ri_vals[c]),
                         self.beta_sol.value*self.K_w.value /
-                        (self.rho_w.value*self.L_sol.value*rw_vals[c])
+                        (self.rho_i.value*self.L_sol.value*rw_vals[c])
                     ]
                     ai_vals[c] = weights[1]/np.sum(weights)
                     aw_vals[c] = weights[2]/np.sum(weights)
@@ -244,8 +244,8 @@ class Parameter:
         # rho = ufl.conditional(T_intold < self.T_melt, self.rho_w, self.rho_i)
         weights = [
             self.c_pw/self.L_sol,
-            self.beta_sol*self.K_i/(self.rho_w*self.L_sol*self.r_i),
-            self.beta_sol*self.K_w/(self.rho_w*self.L_sol*self.r_w)
+            self.beta_sol*self.K_i/(self.rho_i*self.L_sol*self.r_i),
+            self.beta_sol*self.K_w/(self.rho_i*self.L_sol*self.r_w)
         ]
         numerator = weights[0]*self.T_melt + weights[1]*T_i + weights[2]*T_w
         denominator = weights[0] + weights[1] + weights[2]
@@ -290,7 +290,7 @@ class Parameter:
 
     def T_int_numerical(self, T_i, T_w):
         """Numerical evaluation of T_int (as opposed to the symbolic one)."""
-        rho = self.rho_w.value
+        rho = self.rho_i.value
         if self.is_layered:
             ri = np.array(self.r_i.x.array)
             rw = np.array(self.r_w.x.array)
